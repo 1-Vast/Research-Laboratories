@@ -1,0 +1,17 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+logging:
+  level:
+    com.labflow: WARN
+    org.flywaydb: INFO
+
+labflow:
+  jwt:
+    signing-key: pgtest-only-signing-key-at-least-32-bytes-0123456789

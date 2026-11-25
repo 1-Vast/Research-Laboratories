@@ -22,6 +22,8 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <jjwt.version>0.12.6</jjwt.version>
         <springdoc.version>2.8.13</springdoc.version>
+        <embedded-postgres.version>2.2.3</embedded-postgres.version>
+        <embedded-postgres-binaries.version>16.16.0</embedded-postgres-binaries.version>
     </properties>
 
     <dependencies>
@@ -103,6 +105,14 @@
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- 真实 PostgreSQL 集成测试：无需 Docker，测试时启动一个临时 PG 实例 -->
+        <dependency>
+            <groupId>io.zonky.test</groupId>
+            <artifactId>embedded-postgres</artifactId>
+            <version>${embedded-postgres.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -182,4 +192,39 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- 嵌入式 PostgreSQL 需要与操作系统匹配的二进制包；用 profile 按平台激活，避免三个平台全量下载 -->
+        <profile>
+            <id>embedded-postgres-binaries-windows</id>
+            <activation>
+                <os><family>windows</family></os>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>io.zonky.test.postgres</groupId>
+                    <artifactId>embedded-postgres-binaries-windows-amd64</artifactId>
+                    <version>${embedded-postgres-binaries.version}</version>
+                    <scope>test</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+        <profile>
+            <id>embedded-postgres-binaries-linux</id>
+            <activation>
+                <os>
+                    <family>unix</family>
+                    <name>Linux</name>
+                </os>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>io.zonky.test.postgres</groupId>
+                    <artifactId>embedded-postgres-binaries-linux-amd64</artifactId>
+                    <version>${embedded-postgres-binaries.version}</version>
+                    <scope>test</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
 </project>
