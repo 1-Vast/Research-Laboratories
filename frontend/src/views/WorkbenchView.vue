@@ -1,10 +1,36 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import AppLayout from '../components/AppLayout.vue'
-import { authState } from '../stores/auth'
+import { changePassword } from '../api/auth'
+import { apiErrorMessage } from '../api/http'
+import { authState, clearAuth } from '../stores/auth'
 
+const router = useRouter()
 const user = computed(() => authState.user)
 const permissions = computed(() => user.value?.permissions ?? [])
+
+const currentPassword = ref('')
+const newPassword = ref('')
+const passwordError = ref('')
+const passwordNotice = ref('')
+const submitting = ref(false)
+
+async function submitPassword() {
+  passwordError.value = ''
+  passwordNotice.value = ''
+  submitting.value = true
+  try {
+    await changePassword(currentPassword.value, newPassword.value)
+    passwordNotice.value = '密码已修改，全部会话已吊销，正在跳转登录页…'
+    clearAuth()
+    await router.push('/login')
+  } catch (err) {
+    passwordError.value = apiErrorMessage(err)
+  } finally {
+    submitting.value = false
+  }
+}
 </script>
 
 <template>
@@ -32,6 +58,34 @@ const permissions = computed(() => user.value?.permissions ?? [])
         </p>
       </section>
     </div>
+
+    <section class="card" style="margin-top: 18px">
+      <h2>修改密码</h2>
+      <p class="muted" style="font-size: 13px">
+        修改成功后服务端会吊销全部会话（含当前浏览器），需要用新密码重新登录。
+      </p>
+      <p v-if="passwordError" class="error" role="alert">{{ passwordError }}</p>
+      <p v-if="passwordNotice" class="notice">{{ passwordNotice }}</p>
+      <form @submit.prevent="submitPassword">
+        <div class="grid-2">
+          <div class="field">
+            <label for="current-password">当前密码</label>
+            <input id="current-password" v-model="currentPassword" type="password" required
+                   autocomplete="current-password" />
+          </div>
+          <div class="field">
+            <label for="new-password">新密码（至少 8 位，含字母和数字）</label>
+            <input id="new-password" v-model="newPassword" type="password" required minlength="8"
+                   autocomplete="new-password" />
+          </div>
+        </div>
+        <div class="actions">
+          <button class="primary" type="submit" :disabled="submitting">
+            {{ submitting ? '提交中…' : '修改密码' }}
+          </button>
+        </div>
+      </form>
+    </section>
 
     <section class="card" style="margin-top: 18px">
       <h2>我的权限（共 {{ permissions.length }} 项）</h2>

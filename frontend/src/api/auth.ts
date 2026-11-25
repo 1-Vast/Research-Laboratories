@@ -25,6 +25,11 @@ export async function fetchMe(): Promise<MeInfo> {
   return data.data
 }
 
+/** 自助改密：成功后后端吊销全部会话，前端需要重新登录。 */
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  await http.put('/me/password', { currentPassword, newPassword })
+}
+
 /** 页面刷新后尝试用 HttpOnly Cookie 换取新的 access token。 */
 export async function tryRefresh(): Promise<LoginResult | null> {
   try {
