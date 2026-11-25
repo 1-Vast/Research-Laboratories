@@ -9,8 +9,12 @@ import java.time.Clock;
 import java.time.Instant;
 
 /**
- * 审计记录器：与业务写操作同一事务落库（拒绝事件独立提交），只记录脱敏元数据，
- * 不写正文、不写令牌、不写密码。
+ * 审计记录器：只记录脱敏元数据，不写正文、不写令牌、不写密码。
+ * <ul>
+ *   <li>{@link #record} 参与调用方事务：业务回滚时审计一起回滚（成功路径使用）；</li>
+ *   <li>{@link #recordIndependent} 开独立事务：登录失败、越权拒绝等「业务已失败」的事件必须留下痕迹，
+ *       不能因为外层抛出异常而回滚（对应项目书「拒绝事件独立落库」）。</li>
+ * </ul>
  */
 @Service
 public class AuditRecorder {
@@ -30,6 +34,17 @@ public class AuditRecorder {
     @Transactional(propagation = Propagation.REQUIRED)
     public void record(Long actorId, String action, String targetType, Object targetId, String result,
                        String metadata) {
+        save(actorId, action, targetType, targetId, result, metadata);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordIndependent(Long actorId, String action, String targetType, Object targetId, String result,
+                                  String metadata) {
+        save(actorId, action, targetType, targetId, result, metadata);
+    }
+
+    private void save(Long actorId, String action, String targetType, Object targetId, String result,
+                      String metadata) {
         AuditEventJpaEntity entity = new AuditEventJpaEntity();
         entity.setActorId(actorId);
         entity.setAction(action);
