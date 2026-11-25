@@ -49,10 +49,11 @@ public class AdminUserController {
     @GetMapping
     public ApiResponse<PageResult<UserVo>> list(
             @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String sort,
             @RequestParam(defaultValue = "1") @Min(value = 1, message = "page 从 1 开始") int page,
             @RequestParam(defaultValue = "20") @Min(value = 1, message = "size 至少为 1")
             @Max(value = 100, message = "size 最大为 100") int size) {
-        PageResult<User> result = userAdminService.list(keyword, page, size);
+        PageResult<User> result = userAdminService.list(keyword, page, size, sort);
         return ApiResponse.ok(result.map(IdentityWebMapper::toUserVo), TraceContext.currentTraceId());
     }
 

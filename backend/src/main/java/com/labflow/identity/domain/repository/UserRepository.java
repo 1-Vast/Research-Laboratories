@@ -2,6 +2,7 @@ package com.labflow.identity.domain.repository;
 
 import com.labflow.identity.domain.User;
 import com.labflow.shared.api.PageResult;
+import com.labflow.shared.api.SortSpec;
 
 import java.util.Optional;
 
@@ -18,7 +19,7 @@ public interface UserRepository {
 
     User save(User user);
 
-    PageResult<User> search(String keyword, int page, int size);
+    PageResult<User> search(String keyword, int page, int size, SortSpec sort);
 
     /** 统计启用状态且拥有指定角色的用户数（用于“最后一个管理员”保护）。 */
     long countEnabledUsersWithRole(String roleCode);

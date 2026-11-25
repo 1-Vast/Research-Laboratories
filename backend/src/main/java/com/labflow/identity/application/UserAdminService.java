@@ -11,6 +11,7 @@ import com.labflow.identity.domain.repository.RoleRepository;
 import com.labflow.identity.domain.repository.SessionRepository;
 import com.labflow.identity.domain.repository.UserRepository;
 import com.labflow.shared.api.PageResult;
+import com.labflow.shared.api.SortSpec;
 import com.labflow.shared.audit.AuditRecorder;
 import com.labflow.shared.error.BusinessException;
 import com.labflow.shared.error.ErrorCode;
@@ -31,6 +32,8 @@ import java.util.Set;
 public class UserAdminService {
 
     private static final String ADMIN_ROLE_CODE = "SYS_ADMIN";
+    private static final Set<String> SORTABLE_FIELDS =
+            Set.of("id", "username", "displayName", "email", "enabled", "createdAt", "updatedAt");
 
     private final UserRepository users;
     private final RoleRepository roles;
@@ -55,8 +58,9 @@ public class UserAdminService {
     }
 
     @Transactional(readOnly = true)
-    public PageResult<User> list(String keyword, int page, int size) {
-        return users.search(keyword, page, size);
+    public PageResult<User> list(String keyword, int page, int size, String sort) {
+        SortSpec sortSpec = SortSpec.parse(sort, SORTABLE_FIELDS, "id");
+        return users.search(keyword, page, size, sortSpec);
     }
 
     @Transactional(readOnly = true)
@@ -72,12 +76,13 @@ public class UserAdminService {
             throw new BusinessException(ErrorCode.DUPLICATE_USERNAME);
         }
         Set<Role> assignedRoles = resolveRoles(command.roleCodes());
+        if (assignedRoles.isEmpty()) {
+            assignedRoles.add(roles.findByCode(User.DEFAULT_ROLE_CODE)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR, "默认角色缺失")));
+        }
         Instant now = Instant.now(clock);
         User user = User.register(username, passwordEncoder.encode(command.rawPassword()), command.email(),
-                command.displayName(), defaultRoleIfEmpty(assignedRoles), now);
-        if (assignedRoles.size() > 1) {
-            user.assignRoles(assignedRoles, now);
-        }
+                command.displayName(), assignedRoles, now);
         User saved = users.save(user);
         audit.record(actorId, "user.create", "user", saved.id(), AuditRecorder.RESULT_SUCCESS,
                 "roles=" + saved.roleCodes());
@@ -166,11 +171,4 @@ public class UserAdminService {
         return new LinkedHashSet<>(found);
     }
 
-    private Role defaultRoleIfEmpty(Set<Role> assigned) {
-        if (!assigned.isEmpty()) {
-            return assigned.iterator().next();
-        }
-        return roles.findByCode(User.DEFAULT_ROLE_CODE)
-                .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR, "默认角色缺失"));
-    }
 }

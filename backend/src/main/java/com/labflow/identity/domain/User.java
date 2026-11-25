@@ -28,6 +28,11 @@ public class User {
 
     public static User register(String username, String passwordHash, String email, String displayName,
                                 Role defaultRole, Instant now) {
+        return register(username, passwordHash, email, displayName, Set.of(defaultRole), now);
+    }
+
+    public static User register(String username, String passwordHash, String email, String displayName,
+                                Set<Role> initialRoles, Instant now) {
         User user = new User();
         user.username = username;
         user.passwordHash = passwordHash;
@@ -37,7 +42,9 @@ public class User {
         user.authVersion = 0;
         user.createdAt = now;
         user.updatedAt = now;
-        user.roles.add(defaultRole);
+        if (initialRoles != null) {
+            user.roles.addAll(initialRoles);
+        }
         return user;
     }
 

@@ -4,6 +4,7 @@ import com.labflow.identity.domain.Role;
 import com.labflow.identity.domain.User;
 import com.labflow.identity.domain.repository.UserRepository;
 import com.labflow.shared.api.PageResult;
+import com.labflow.shared.api.SortSpec;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -65,10 +66,11 @@ public class UserRepositoryAdapter implements UserRepository {
     }
 
     @Override
-    public PageResult<User> search(String keyword, int page, int size) {
+    public PageResult<User> search(String keyword, int page, int size, SortSpec sort) {
         String normalized = keyword == null || keyword.isBlank() ? null : keyword.trim();
         String pattern = normalized == null ? null : "%" + normalized.toLowerCase(Locale.ROOT) + "%";
-        PageRequest pageRequest = PageRequest.of(page - 1, size, Sort.by(Sort.Direction.ASC, "id"));
+        Sort.Direction direction = sort.ascending() ? Sort.Direction.ASC : Sort.Direction.DESC;
+        PageRequest pageRequest = PageRequest.of(page - 1, size, Sort.by(direction, sort.field()));
         Page<UserJpaEntity> result = users.search(normalized, pattern, pageRequest);
         return PageResult.of(result.getContent().stream().map(IdentityMapper::toDomain).toList(),
                 result.getTotalElements(), page, size);

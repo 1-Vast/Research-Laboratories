@@ -2,6 +2,7 @@ package com.labflow.identity.domain.repository;
 
 import com.labflow.identity.domain.Role;
 import com.labflow.shared.api.PageResult;
+import com.labflow.shared.api.SortSpec;
 
 import java.util.Collection;
 import java.util.List;
@@ -23,7 +24,7 @@ public interface RoleRepository {
 
     void delete(Role role);
 
-    PageResult<Role> search(String keyword, int page, int size);
+    PageResult<Role> search(String keyword, int page, int size, SortSpec sort);
 
     long countAssignedUsers(Long roleId);
 }

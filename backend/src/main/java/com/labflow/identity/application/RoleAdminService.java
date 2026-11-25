@@ -7,6 +7,7 @@ import com.labflow.identity.domain.Role;
 import com.labflow.identity.domain.repository.PermissionRepository;
 import com.labflow.identity.domain.repository.RoleRepository;
 import com.labflow.shared.api.PageResult;
+import com.labflow.shared.api.SortSpec;
 import com.labflow.shared.audit.AuditRecorder;
 import com.labflow.shared.error.BusinessException;
 import com.labflow.shared.error.ErrorCode;
@@ -28,6 +29,7 @@ import java.util.Set;
 public class RoleAdminService {
 
     private static final Set<String> PLATFORM_CRITICAL_PERMISSIONS = Set.of("user:manage", "role:manage");
+    private static final Set<String> SORTABLE_FIELDS = Set.of("id", "code", "name", "createdAt", "updatedAt");
 
     private final RoleRepository roles;
     private final PermissionRepository permissions;
@@ -43,8 +45,9 @@ public class RoleAdminService {
     }
 
     @Transactional(readOnly = true)
-    public PageResult<Role> list(String keyword, int page, int size) {
-        return roles.search(keyword, page, size);
+    public PageResult<Role> list(String keyword, int page, int size, String sort) {
+        SortSpec sortSpec = SortSpec.parse(sort, SORTABLE_FIELDS, "id");
+        return roles.search(keyword, page, size, sortSpec);
     }
 
     @Transactional(readOnly = true)
