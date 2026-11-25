@@ -35,6 +35,13 @@ server:
       charset: UTF-8
       force: true
 
+logging:
+  pattern:
+    # traceId 由 TraceIdFilter 写入 MDC，日志与响应体、审计记录可据此对齐
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{traceId:-no-trace}] %logger{40} - %msg%n"
+  level:
+    com.labflow: INFO
+
 management:
   endpoints:
     web:
