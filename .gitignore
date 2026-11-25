@@ -35,6 +35,7 @@ Thumbs.db
 .tools/
 _tmp_*
 _dump_*.txt
+backend/cp.txt
 ~$*
 *.tmp
 coverage/
