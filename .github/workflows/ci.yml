@@ -26,6 +26,10 @@ jobs:
           java-version: '17'
           cache: maven
 
+      - name: 赋予 Maven Wrapper 执行权限
+        # 仓库在 Windows 上维护，克隆后可能丢失可执行位，这里显式补齐
+        run: chmod +x mvnw
+
       - name: 运行测试并校验覆盖率
         # verify 会执行 Surefire 与 JaCoCo check（整体行覆盖率 ≥ 85%，application 包 ≥ 80%）
         run: ./mvnw -B --no-transfer-progress verify
