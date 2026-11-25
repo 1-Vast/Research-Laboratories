@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    # H2 文件库（PostgreSQL 兼容模式）：零安装、数据落盘，重启不丢
+    url: jdbc:h2:file:./data/labflow;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    username: sa
+    password: ''
+    driver-class-name: org.h2.Driver
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  flyway:
+    # H2 模式下 Flyway 使用同名迁移脚本，语句保持 PostgreSQL 兼容子集
+    enabled: true
+
+logging:
+  level:
+    com.labflow: INFO
+    org.springframework.security: INFO
