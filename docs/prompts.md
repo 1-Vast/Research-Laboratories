@@ -65,7 +65,30 @@ Service 检查 lab/project 成员关系、负责人和作者。列表先按作�
 | 用户名归一化测试用例带前后空格，被 DTO 正则先拦截 | 改为仅大小写归一化，空白由 DTO 校验拒绝（符合设计） |
 | 覆盖率图表首次渲染数字颜色未设置导致不可见 | 修正绘图脚本后重新生成 |
 
-## 5. 待人工确认事项（学生须自行完成）
+## 5. 第二阶段加固（同日）的提示词与产出
+
+任务级提示词（原文）：
+
+```text
+根据你的想法，对当前阶段进行改良和优化
+```
+
+据此确定的改进范围（均已在 CI/测试中验证）：
+
+| 方向 | 产出文件 | 验证方式 |
+| --- | --- | --- |
+| 登录失败限流 | `identity/application/LoginThrottle.java`、`AuthService` | `SecurityHardeningApiTest`、`LoginThrottleTest` |
+| Cookie 接口来源校验 | `shared/security/TrustedOriginValidator.java`、`AuthController` | `SecurityHardeningApiTest` |
+| 数据库控制台仅 dev 放行 | `shared/security/SecurityConfig.java` | `h2ConsoleIsNotPublicOutsideDev` |
+| 拒绝事件独立审计 | `shared/audit/AuditRecorder.java`、`GlobalExceptionHandler`、`RestAccessDeniedHandler` | `deniedAccessIsAudited`、`failedLoginIsAudited` |
+| 审计查询（作用域收敛） | `shared/audit/AuditQueryService.java`、`AdminAuditController` | `auditQueryIsScopedForNonAdmin`、`researcherCannotReadAudit` |
+| 列表白名单排序 | `shared/api/SortSpec.java`、仓储端口与适配器 | `AdminApiTest`、`SortSpecTest` |
+| 覆盖率门禁 + CI | `backend/pom.xml`（jacoco check）、`.github/workflows/ci.yml` | CI 运行记录 45564892809 |
+| 前端 token 仅内存 + 审计页 | `frontend/src/stores/auth.ts`、`views/AuditView.vue` | 构建通过（浏览器逐页点测待补） |
+
+仍需人工确认：限流的 5 次/10 分钟阈值是否适合课堂演示、审计查询对 PI 的作用域收紧是否符合教师预期。
+
+## 6. 待人工确认事项（学生须自行完成）
 
 1. README 分工表中的姓名、学号、贡献比例需按实际情况填写；
 2. 逐文件理解代码，尤其是 `AccessTokenAuthenticator`、`AuthService.refresh`、`SecurityConfig` 三处安全关键逻辑；
