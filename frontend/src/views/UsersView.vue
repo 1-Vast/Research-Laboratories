@@ -5,6 +5,7 @@ import { apiErrorMessage } from '../api/http'
 import {
   assignUserRoles,
   createUser,
+  deleteUser,
   listRoles,
   listUsers,
   setUserEnabled,
@@ -70,6 +71,19 @@ async function submitCreate() {
     error.value = apiErrorMessage(err)
   } finally {
     creating.value = false
+  }
+}
+
+async function removeUser(user: UserInfo) {
+  if (!window.confirm(`确认删除用户「${user.username}」？删除为逻辑删除，历史数据保留。`)) {
+    return
+  }
+  error.value = ''
+  try {
+    await deleteUser(user.id)
+    await loadUsers()
+  } catch (err) {
+    error.value = apiErrorMessage(err)
   }
 }
 
@@ -183,6 +197,7 @@ onMounted(async () => {
                 <button type="button" @click="toggleEnabled(user)">
                   {{ user.enabled ? '禁用' : '启用' }}
                 </button>
+                <button type="button" @click="removeUser(user)">删除</button>
               </template>
             </td>
           </tr>

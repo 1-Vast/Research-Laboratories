@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import AppLayout from '../components/AppLayout.vue'
 import { apiErrorMessage } from '../api/http'
-import { assignRolePermissions, createRole, listPermissions, listRoles } from '../api/admin'
+import { assignRolePermissions, createRole, deleteRole, listPermissions, listRoles } from '../api/admin'
 import type { PermissionInfo, RoleInfo } from '../types'
 
 const roles = ref<RoleInfo[]>([])
@@ -65,6 +65,26 @@ async function savePermissions() {
     error.value = apiErrorMessage(err)
   } finally {
     saving.value = false
+  }
+}
+
+async function removeRole() {
+  if (!selected.value || selected.value.protectedRole) {
+    return
+  }
+  if (!window.confirm(`确认删除角色「${selected.value.name}」？仍被用户引用时会被拒绝。`)) {
+    return
+  }
+  error.value = ''
+  message.value = ''
+  try {
+    await deleteRole(selected.value.id)
+    selected.value = null
+    draft.value = []
+    await load()
+    message.value = '角色已删除'
+  } catch (err) {
+    error.value = apiErrorMessage(err)
   }
 }
 
@@ -162,6 +182,7 @@ onMounted(load)
           {{ saving ? '保存中…' : '保存权限' }}
         </button>
         <button type="button" @click="select(selected)">重置</button>
+        <button type="button" :disabled="selected.protectedRole" @click="removeRole">删除角色</button>
         <span v-if="selected.protectedRole" class="muted">
           内置管理员角色必须保留 user:manage 与 role:manage
         </span>

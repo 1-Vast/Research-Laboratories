@@ -4,6 +4,7 @@ import RegisterView from '../views/RegisterView.vue'
 import WorkbenchView from '../views/WorkbenchView.vue'
 import UsersView from '../views/UsersView.vue'
 import RolesView from '../views/RolesView.vue'
+import AuditView from '../views/AuditView.vue'
 import { authState, clearAuth, hasPermission, setToken, setUser } from '../stores/auth'
 import { fetchMe, tryRefresh } from '../api/auth'
 
@@ -25,6 +26,12 @@ const router = createRouter({
       name: 'admin-roles',
       component: RolesView,
       meta: { permission: 'role:manage' },
+    },
+    {
+      path: '/admin/audit',
+      name: 'admin-audit',
+      component: AuditView,
+      meta: { permission: 'audit:read' },
     },
     { path: '/:pathMatch(.*)*', redirect: '/workbench' },
   ],

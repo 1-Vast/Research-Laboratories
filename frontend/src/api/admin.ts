@@ -1,5 +1,5 @@
 import http from './http'
-import type { ApiResponse, PageResult, PermissionInfo, RoleInfo, UserInfo } from '../types'
+import type { ApiResponse, AuditEventInfo, PageResult, PermissionInfo, RoleInfo, UserInfo } from '../types'
 
 export async function listUsers(params: {
   keyword?: string
@@ -56,5 +56,31 @@ export async function listPermissions(): Promise<PermissionInfo[]> {
 
 export async function assignRolePermissions(id: number, permissions: string[]): Promise<RoleInfo> {
   const { data } = await http.put<ApiResponse<RoleInfo>>(`/admin/roles/${id}/permissions`, { permissions })
+  return data.data
+}
+
+export async function deleteRole(id: number): Promise<void> {
+  await http.delete(`/admin/roles/${id}`)
+}
+
+export async function deleteUser(id: number): Promise<void> {
+  await http.delete(`/admin/users/${id}`)
+}
+
+export async function updateUser(
+  id: number,
+  payload: { displayName?: string; email?: string },
+): Promise<UserInfo> {
+  const { data } = await http.patch<ApiResponse<UserInfo>>(`/admin/users/${id}`, payload)
+  return data.data
+}
+
+export async function listAuditEvents(params: {
+  action?: string
+  actorId?: number
+  page: number
+  size: number
+}): Promise<PageResult<AuditEventInfo>> {
+  const { data } = await http.get<ApiResponse<PageResult<AuditEventInfo>>>('/admin/audit-events', { params })
   return data.data
 }

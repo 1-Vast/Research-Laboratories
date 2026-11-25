@@ -72,6 +72,9 @@ export function apiErrorMessage(error: unknown): string {
     if (error.response?.status === 403) {
       return '没有执行该操作的权限'
     }
+    if (error.response?.status === 429) {
+      return '操作过于频繁，请稍后再试'
+    }
     return error.message
   }
   return '请求失败，请稍后重试'

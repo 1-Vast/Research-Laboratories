@@ -60,3 +60,16 @@ export interface PageResult<T> {
   page: number
   size: number
 }
+
+/** 审计事件只读视图（不含令牌与正文）。 */
+export interface AuditEventInfo {
+  id: number
+  actorId?: number
+  action: string
+  targetType?: string
+  targetId?: string
+  result: string
+  traceId?: string
+  metadata?: string
+  createdAt: string
+}

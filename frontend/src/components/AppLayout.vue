@@ -28,6 +28,9 @@ async function handleLogout() {
       <RouterLink v-if="hasPermission('role:manage')" to="/admin/roles" active-class="active">
         角色与权限
       </RouterLink>
+      <RouterLink v-if="hasPermission('audit:read')" to="/admin/audit" active-class="active">
+        审计日志
+      </RouterLink>
     </nav>
     <div class="layout-user">
       <span>{{ displayName }}</span>
