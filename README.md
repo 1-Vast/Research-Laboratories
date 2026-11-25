@@ -5,6 +5,7 @@
 - 技术栈：**Vue 3 + TypeScript / Spring Boot 3.4 / Spring Security + JWT / PostgreSQL（本地 H2）**
 - 当前进度：**第一阶段（可运行底座）已完成并通过测试**，第二、三阶段按 [实施计划](docs/design/05-实施计划.md) 推进
 - 设计文档索引：[初步设计总览](docs/design/00-初步设计总览.md) · [架构设计](docs/design/01-架构设计.md) · [数据库设计](docs/design/02-数据库设计.md) · [权限设计](docs/design/03-权限设计.md) · [接口设计](docs/design/04-接口设计.md) · [实施计划](docs/design/05-实施计划.md)
+- 进展记录：[log/](log/README.md)（按日期归档的开发日志与里程碑状态）
 
 ![系统架构](docs/assets/architecture.png)
 
@@ -353,7 +354,8 @@ mvnw.cmd verify      # 生成 JaCoCo 覆盖率报告：target/site/jacoco/index.
 │   ├── assets/              架构图、覆盖率摘要
 │   ├── testing.md           测试清单与结果
 │   └── prompts.md           AI 使用记录与核心 prompt
-├── scripts/                 文档配图生成脚本
+├── log/                     项目进展日志（按日期归档、里程碑状态、决策与证据）
+├── scripts/                 文档配图与交付文档生成脚本
 ├── .env.example             环境变量模板（无真实密钥）
 └── README.md
 ```
