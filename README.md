@@ -53,7 +53,7 @@
 |  | Spring Data JPA（Hibernate 6） | 3.4 |
 |  | JJWT（HS256） | 0.12.6 |
 |  | springdoc-openapi（Swagger UI） | 2.8.13 |
-| 数据库 | PostgreSQL 14+（生产） | 14+ |
+| 数据库 | PostgreSQL 14+（生产，已由集成测试验证） | 16（测试实例） |
 |  | H2 2.x（本地开发，PostgreSQL 兼容模式） | 随 Boot 管理 |
 | 迁移 | Flyway | 10.x |
 | 测试 | JUnit 5 / Mockito / MockMvc / AssertJ / JaCoCo | 5.11 / 5.x / 6.x / 3.x / 0.8.12 |
@@ -172,7 +172,7 @@ sequenceDiagram
 | 角色 | 功能 |
 | --- | --- |
 | 访客 | 注册（用户名唯一、密码强度后端校验、默认 `RESEARCHER`）、登录 |
-| 所有登录用户 | 查看当前用户与权限、退出登录（服务端吊销）、刷新令牌轮换 |
+| 所有登录用户 | 查看当前用户与权限、退出登录（服务端吊销）、刷新令牌轮换、**自助改密（吊销全部会话）** |
 | 系统管理员 | 用户分页/搜索/排序、创建、编辑、启用/禁用、分配角色、逻辑删除；角色增删改查、分配权限；权限目录查询；审计日志查询 |
 | 审计查看者（`audit:read`） | 管理员看全部脱敏记录；PI 仅看到与本人相关的记录 |
 | 安全防护 | 登录失败限流（5 次 / 10 分钟 → 429）、Cookie 接口来源校验、越权与登录失败独立落库审计、数据库控制台仅 dev 放行 |
@@ -184,6 +184,7 @@ sequenceDiagram
 - 未做浏览器 E2E、Docker Compose、Redis / MinIO / WebSocket（第三阶段）；
 - `lab_members`、`labs` 表已建但暂无对应接口（第二阶段随项目作用域实现）；
 - 登录限流为进程内固定窗口（重启清零、多实例不共享），第三阶段换 Redis 计数；
+- PostgreSQL 集成测试覆盖单实例的迁移/约束/主链路，多线程并发场景随第二阶段业务状态机补充；
 - 审计仅覆盖身份与授权相关操作，业务审计随第二、三阶段接口补充。
 
 ## 8. 接口文档
@@ -203,6 +204,7 @@ sequenceDiagram
 | POST | `/api/v1/auth/refresh` | 刷新 Cookie |
 | POST | `/api/v1/auth/logout` | 已认证 |
 | GET | `/api/v1/me` | 已认证 |
+| PUT | `/api/v1/me/password` | 已认证（改密后全部会话失效） |
 | GET/POST | `/api/v1/admin/users`（GET 支持 `keyword`、`sort`、`page`、`size`） | `user:manage` |
 | GET/PATCH/DELETE | `/api/v1/admin/users/{id}` | `user:manage` |
 | PATCH | `/api/v1/admin/users/{id}/enabled` | `user:manage` |
@@ -223,7 +225,7 @@ sequenceDiagram
 | --- | --- | --- |
 | JDK | 17+ | `java -version` 确认 |
 | Node.js | 20+ | `node -v` 确认 |
-| 数据库 | **无需安装** | 默认使用 H2 文件库，数据落在 `backend/data/labflow.mv.db` |
+| 数据库 | **无需安装** | 默认使用 H2 文件库，数据落在 `backend/data/labflow.mv.db`；生产 PostgreSQL 已由集成测试验证 |
 
 > 若使用 PostgreSQL：把 profile 切到 `prod` 并设置 `DB_URL/DB_USER/DB_PASSWORD`，Flyway 会自动执行同一套迁移脚本（`V1__schema.sql`、`V2__seed_data.sql`）。
 
@@ -293,8 +295,9 @@ mvnw.cmd verify      # 生成 JaCoCo 覆盖率报告：target/site/jacoco/index.
 
 ### 11.2 结果（实测）
 
-- **87 个有效用例，全部通过**（接口级 47 个，领域/服务单元 40 个）
-- **整体行覆盖率 91.9%**；`identity.application` 包 91.5%（最低类 86.9%），JaCoCo 门禁整体 ≥85%、包 ≥80% 已在 CI 中强制
+- **102 个有效用例，全部通过**（接口级 54 个、领域/服务单元 42 个、**真实 PostgreSQL 集成 6 个**）
+- **真实 PostgreSQL 16 集成测试**：测试启动临时实例，执行与生产完全相同的 Flyway 脚本，验证建表、唯一约束、会话吊销、动态权限与审计
+- **整体行覆盖率 92.2%**；`identity.application` 包 91.9%（最低类 86.9%），JaCoCo 门禁整体 ≥85%、包 ≥80% 已在 CI 中强制
 - 覆盖必测场景：注册重名、弱密码、登录成功/失败（统一提示）、**退出后旧令牌 401**、无权限 403、账号禁用、刷新令牌重放、**动态权限生效**、最后一个管理员保护、内置角色/被引用角色删除、**登录限流 429**、**来源校验**、**越权与失败登录审计留痕**、排序与分页边界
 - CI：GitHub Actions 每次推送执行 `mvnw verify` + 前端构建，[最近一次运行](https://github.com/1-Vast/Intelligent-Collaborative-Management-Platform-for-Scientific-Research-Laboratories/actions/workflows/ci.yml) 成功
 

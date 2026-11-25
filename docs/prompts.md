@@ -88,7 +88,23 @@ Service 检查 lab/project 成员关系、负责人和作者。列表先按作�
 
 仍需人工确认：限流的 5 次/10 分钟阈值是否适合课堂演示、审计查询对 PI 的作用域收紧是否符合教师预期。
 
-## 6. 待人工确认事项（学生须自行完成）
+## 6. 第三阶段加固（同日）的提示词与产出
+
+任务级提示词（原文）：`根据你的想法，对当前阶段进行改良和优化`（同日第二次下达）。
+
+据此确定的改进范围与验证方式：
+
+| 方向 | 产出文件 | 验证方式 |
+| --- | --- | --- |
+| 真实 PostgreSQL 验证 | `src/test/java/com/labflow/PostgresApiTest.java`、`application-pgtest.yml`、`pom.xml`（按平台激活嵌入式 PG 二进制） | 本机 PG 16.16 + GitHub Linux Runner 均 6/6 通过 |
+| 自助改密 | `AuthService.changePassword`、`MeController`、`ChangePasswordRequest` | `PasswordChangeApiTest` 7 个用例 + 真实 HTTP 冒烟 |
+| 访问日志与 traceId | `shared/web/RequestLoggingFilter`、`application.yml` 日志格式 | 实测日志行含 traceId 与用户名 |
+| 移除默认内存用户 | `LabFlowApplication` 排除 `UserDetailsServiceAutoConfiguration` | 启动日志不再出现 `Using generated security password` |
+| 前端改密入口 | `frontend/src/views/WorkbenchView.vue`、`api/auth.ts` | 构建通过；接口联调待浏览器点测 |
+
+待人工确认：改密后是否应保留当前会话（当前实现为全部吊销并要求重新登录）。
+
+## 7. 待人工确认事项（学生须自行完成）
 
 1. README 分工表中的姓名、学号、贡献比例需按实际情况填写；
 2. 逐文件理解代码，尤其是 `AccessTokenAuthenticator`、`AuthService.refresh`、`SecurityConfig` 三处安全关键逻辑；

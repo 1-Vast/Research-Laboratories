@@ -87,7 +87,7 @@ def build_coverage_image(rows):
     draw = ImageDraw.Draw(img)
 
     draw.text((40, 30), "LabFlow 后端测试覆盖率摘要", font=font(26, True), fill=INK)
-    draw.text((40, 72), f"来源：JaCoCo 0.8.12 · 87 个用例全部通过 · 整体行覆盖率 {overall:.1f}%",
+    draw.text((40, 72), f"来源：JaCoCo 0.8.12 · 102 个用例全部通过 · 整体行覆盖率 {overall:.1f}%",
               font=font(15), fill=MUTED)
 
     cols = [40, 330, 560, 760]

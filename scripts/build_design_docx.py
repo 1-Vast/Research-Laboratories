@@ -405,6 +405,8 @@ table(
         ["刷新令牌重放", "used_at 检测 + 会话族吊销", "AuthService.refresh"],
         ["密钥入库", "环境变量注入；未配置时随机生成", "JwtService"],
         ["异常堆栈外泄", "全局异常处理统一响应", "GlobalExceptionHandler"],
+        ["改密后旧设备仍可访问", "递增 auth_version 并吊销全部会话与刷新令牌", "AuthService.changePassword"],
+        ["默认内存用户被误用", "排除 UserDetailsServiceAutoConfiguration", "LabFlowApplication"],
     ],
     widths=[4.4, 7.0, 4.0],
 )
@@ -474,6 +476,8 @@ code_block([
 ])
 para("完整 ER 图（Mermaid）见 docs/design/02-数据库设计.md；第二阶段将补充 projects、project_members、project_reviews、"
      "tasks、task_submissions、reports、report_tasks 等 7 张表。", indent=True)
+para("兼容性验证：PostgresApiTest 在临时 PostgreSQL 16 实例上执行同一套迁移脚本，验证建表、唯一约束、会话吊销、"
+     "动态权限与审计，因此「本地 H2、生产 PostgreSQL」有测试证据而非仅文档承诺。", indent=True)
 
 doc.add_heading("7.3  表清单与用途", level=2)
 table(
@@ -531,6 +535,7 @@ table(
         ["GET/PATCH/DELETE", "/api/v1/admin/roles/{id}", "role:manage", "详情、改名、删除"],
         ["GET", "/api/v1/admin/permissions", "role:manage", "权限目录"],
         ["GET", "/api/v1/admin/audit-events", "audit:read", "审计查询（管理员全部 / 其他本人）"],
+        ["PUT", "/api/v1/me/password", "已认证", "自助改密，成功后吊销全部会话"],
         ["PUT", "/api/v1/admin/roles/{id}/permissions", "role:manage", "替换权限集合"],
     ],
     widths=[3.0, 8.0, 2.8, 4.6],
@@ -552,6 +557,9 @@ table(
         ["审计", "登录成功/失败、注册、退出、用户与角色变更、越权访问写入审计表；拒绝事件独立事务", "已完成"],
     ["安全加固", "登录失败限流（429）、Cookie 接口来源校验、数据库控制台仅 dev 放行", "已完成"],
     ["质量门禁", "JaCoCo 覆盖率 check + GitHub Actions（后端 verify + 前端构建）", "已完成"],
+    ["数据库兼容", "嵌入式 PostgreSQL 16 集成测试：Flyway 建表、唯一约束、会话吊销、动态权限、审计", "已完成"],
+    ["认证完整性", "自助改密：校验旧密码、吊销全部会话（含当前）", "已完成"],
+    ["可观测性", "访问日志带 traceId，与响应头、审计记录可对齐", "已完成"],
         ["前端", "登录、注册、工作台、用户管理、角色权限、审计日志 6 页", "已完成"],
         ["业务模块", "项目、任务、周报、资源、成果知识、通知、AI", "第二阶段起实施"],
     ],
@@ -559,8 +567,9 @@ table(
 )
 
 doc.add_heading("9.2  测试与覆盖率", level=2)
-para("87 个有效用例全部通过：接口级 47 个（认证 14 + RBAC 14 + 安全加固 10 + 管理维护 9），领域/服务单元 40 个。"
-     "整体行覆盖率 91.9%，application 包 91.5%（最低类 86.9%），满足课程「≥ 20 个有效用例、Service 行覆盖率 ≥ 60%、"
+para("102 个有效用例全部通过：接口级 54 个（认证 14 + RBAC 14 + 安全加固 10 + 管理维护 9 + 自助改密 7），"
+     "领域/服务单元 42 个，另有 6 个真实 PostgreSQL 集成用例（测试启动临时 PG 16 实例执行同一套 Flyway 迁移）。"
+     "整体行覆盖率 92.2%，application 包 91.9%（最低类 86.9%），满足课程「≥ 20 个有效用例、Service 行覆盖率 ≥ 60%、"
      "≥ 3 个 Controller 测试」要求；JaCoCo 门禁（整体 ≥ 85%、application 包 ≥ 80%）在 CI 中强制校验。", indent=True)
 doc.add_picture(COVERAGE, width=Cm(14.5))
 doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -585,6 +594,9 @@ table(
         ["POST /auth/refresh（伪造 Referer）", "403 FORBIDDEN"],
         ["GET /admin/audit-events（PI）", "200，仅本人记录（作用域收敛）"],
         ["GET /h2-console（dev）", "200（仅本地放行；测试/生产 401）"],
+        ["PUT /me/password（改密）", "204；旧令牌 401；旧密码登录 401；新密码登录 200"],
+        ["访问日志", "request completed method=... status=200 duration=6ms user=admin_demo（含 traceId）"],
+        ["PostgreSQL 集成测试", "临时 PG 16 实例上 Flyway 建 10 表、登录/退出/禁用/动态权限全通过"],
     ],
     widths=[8.0, 10.0],
     font_size=9,
