@@ -162,6 +162,33 @@ class AuthServiceTest {
         verify(refreshTokens).revokeBySessionId(used.sessionId(), NOW);
     }
 
+    @Test
+    @DisplayName("改密：校验旧密码、递增授权版本并吊销全部会话")
+    void changePasswordRevokesAllSessions() {
+        User user = activeUser();
+        when(users.findById(1L)).thenReturn(Optional.of(user));
+
+        service.changePassword(1L, "Passw0rd1", "NewPassw0rd2");
+
+        assertThat(user.authVersion()).isEqualTo(1);
+        assertThat(encoder.matches("NewPassw0rd2", user.passwordHash())).isTrue();
+        verify(users).save(user);
+        verify(sessions).revokeAllByUserId(1L, NOW);
+        verify(refreshTokens).revokeByUserId(1L, NOW);
+    }
+
+    @Test
+    @DisplayName("改密：旧密码不正确时不做任何修改")
+    void changePasswordRejectsWrongCurrentPassword() {
+        when(users.findById(1L)).thenReturn(Optional.of(activeUser()));
+
+        assertThatThrownBy(() -> service.changePassword(1L, "WrongPassw0rd1", "NewPassw0rd2"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("当前密码不正确");
+        verify(users, never()).save(any());
+        verify(sessions, never()).revokeAllByUserId(anyLong(), any());
+    }
+
     private User activeUser() {
         return User.restore(1L, "alice", encoder.encode("Passw0rd1"), "alice@labflow.test", "Alice", true, 0,
                 NOW, NOW, Set.of(researcherRole()));

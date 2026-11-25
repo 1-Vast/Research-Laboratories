@@ -175,6 +175,28 @@ public class AuthService {
         return users.findById(userId).orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
     }
 
+    /**
+     * 自助改密：校验旧密码 → 策略校验新密码 → 递增 auth_version → 吊销全部会话与刷新令牌。
+     * <p>改密属于敏感操作，即使当前令牌也会失效，前端需要重新登录；否则旧设备上的会话仍可继续使用。</p>
+     */
+    @Transactional
+    public void changePassword(Long userId, String currentPassword, String newPassword) {
+        User user = users.findById(userId).orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        if (!passwordEncoder.matches(currentPassword, user.passwordHash())) {
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED, "当前密码不正确");
+        }
+        passwordPolicy.validate(newPassword);
+        if (passwordEncoder.matches(newPassword, user.passwordHash())) {
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED, "新密码不能与当前密码相同");
+        }
+        Instant now = Instant.now(clock);
+        user.changePassword(passwordEncoder.encode(newPassword), now);
+        users.save(user);
+        sessions.revokeAllByUserId(userId, now);
+        refreshTokens.revokeByUserId(userId, now);
+        audit.record(userId, "auth.password.change", "user", userId, AuditRecorder.RESULT_SUCCESS, null);
+    }
+
     private void revokeSessionFamily(UUID sessionId, Instant now) {
         sessions.findById(sessionId).ifPresent(session -> {
             session.revoke(now);
