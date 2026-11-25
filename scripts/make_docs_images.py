@@ -70,9 +70,9 @@ def read_coverage():
 def build_coverage_image(rows):
     services = [r for r in rows if r[1] in {
         "AuthService", "UserAdminService", "RoleAdminService", "AccessTokenAuthenticator",
-        "JwtService", "PasswordPolicy", "User", "Role"}]
-    order = ["AuthService", "AccessTokenAuthenticator", "JwtService", "User", "Role",
-             "PasswordPolicy", "RoleAdminService", "UserAdminService"]
+        "LoginThrottle", "AuditQueryService", "JwtService", "PasswordPolicy", "User", "Role"}]
+    order = ["AuthService", "AccessTokenAuthenticator", "LoginThrottle", "JwtService", "User", "Role",
+             "PasswordPolicy", "AuditQueryService", "RoleAdminService", "UserAdminService"]
     services.sort(key=lambda r: order.index(r[1]) if r[1] in order else 99)
 
     total_cov = sum(r[2] for r in rows)
@@ -87,7 +87,7 @@ def build_coverage_image(rows):
     draw = ImageDraw.Draw(img)
 
     draw.text((40, 30), "LabFlow 后端测试覆盖率摘要", font=font(26, True), fill=INK)
-    draw.text((40, 72), f"来源：JaCoCo 0.8.12 · 58 个用例全部通过 · 整体行覆盖率 {overall:.1f}%",
+    draw.text((40, 72), f"来源：JaCoCo 0.8.12 · 87 个用例全部通过 · 整体行覆盖率 {overall:.1f}%",
               font=font(15), fill=MUTED)
 
     cols = [40, 330, 560, 760]
@@ -112,7 +112,7 @@ def build_coverage_image(rows):
         y = draw_row(y, cls, cov, miss, pct)
 
     y = draw_row(y, "全部类合计", total_cov, total_miss, overall, strong=True)
-    draw.text((40, y + 10), "Service / Application 层均 ≥ 60%，满足课程要求。",
+    draw.text((40, y + 10), "Service / Application 层均 ≥ 60%，且由 JaCoCo check 在 CI 中强制校验。",
               font=font(13), fill=MUTED)
 
     img.save(os.path.join(ASSETS, "coverage-summary.png"))

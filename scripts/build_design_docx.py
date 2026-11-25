@@ -454,6 +454,8 @@ bullet("权限变更：管理员替换角色权限集合后，下一次请求即
 bullet("最后一个管理员：禁用或降级前统计「除本人外仍启用的管理员数」，为 0 时返回 409。")
 bullet("内置角色：不可删除、不可改名；内置管理员角色必须保留 user:manage 与 role:manage。")
 bullet("角色引用：仍被用户引用的角色不可删除（409 ROLE_IN_USE）。")
+bullet("登录限流：同一用户名与来源 IP 在 10 分钟内失败 5 次后返回 429；成功登录清零计数。")
+bullet("审计闭环：登录成功/失败、用户与角色变更、越权访问均留痕；拒绝事件用独立事务写入，不回随业务回滚。")
 
 # ---------- 7 database ----------
 doc.add_heading("7  数据库设计", level=1)
@@ -528,12 +530,14 @@ table(
         ["GET/POST", "/api/v1/admin/roles", "role:manage", "分页、创建"],
         ["GET/PATCH/DELETE", "/api/v1/admin/roles/{id}", "role:manage", "详情、改名、删除"],
         ["GET", "/api/v1/admin/permissions", "role:manage", "权限目录"],
+        ["GET", "/api/v1/admin/audit-events", "audit:read", "审计查询（管理员全部 / 其他本人）"],
         ["PUT", "/api/v1/admin/roles/{id}/permissions", "role:manage", "替换权限集合"],
     ],
     widths=[3.0, 8.0, 2.8, 4.6],
     font_size=9,
 )
-para("在线文档：http://localhost:8080/swagger-ui.html；OpenAPI：/v3/api-docs（实测返回 12 KB 完整契约）。", size=9.5, color=MUTED)
+para("列表接口支持 sort=field[,asc|desc] 白名单排序；在线文档：http://localhost:8080/swagger-ui.html；"
+     "OpenAPI：/v3/api-docs（实测返回 12 KB 完整契约）。", size=9.5, color=MUTED)
 
 # ---------- 9 implementation ----------
 doc.add_heading("9  第一阶段实现与验证", level=1)
@@ -545,16 +549,19 @@ table(
         ["数据库", "Flyway 迁移（10 表）、四角色/49 权限/5 账号种子数据", "已完成"],
         ["认证", "注册、登录、刷新轮换、退出吊销、当前用户", "已完成"],
         ["RBAC", "用户/角色/权限管理、后端强制校验、动态权限、管理员保护", "已完成"],
-        ["审计", "注册、登录、用户与角色变更写入审计表", "已完成"],
-        ["前端", "登录、注册、工作台、用户管理、角色权限 5 页", "已完成"],
+        ["审计", "登录成功/失败、注册、退出、用户与角色变更、越权访问写入审计表；拒绝事件独立事务", "已完成"],
+    ["安全加固", "登录失败限流（429）、Cookie 接口来源校验、数据库控制台仅 dev 放行", "已完成"],
+    ["质量门禁", "JaCoCo 覆盖率 check + GitHub Actions（后端 verify + 前端构建）", "已完成"],
+        ["前端", "登录、注册、工作台、用户管理、角色权限、审计日志 6 页", "已完成"],
         ["业务模块", "项目、任务、周报、资源、成果知识、通知、AI", "第二阶段起实施"],
     ],
     widths=[3.0, 10.6, 3.0],
 )
 
 doc.add_heading("9.2  测试与覆盖率", level=2)
-para("58 个有效用例全部通过：接口级 28 个（认证 14 + RBAC 14），领域/服务单元 30 个。整体行覆盖率 86.7%，"
-     "Service/Application 层最低 67.9%，满足课程「≥ 20 个有效用例、Service 行覆盖率 ≥ 60%、≥ 3 个 Controller 测试」要求。", indent=True)
+para("87 个有效用例全部通过：接口级 47 个（认证 14 + RBAC 14 + 安全加固 10 + 管理维护 9），领域/服务单元 40 个。"
+     "整体行覆盖率 91.9%，application 包 91.5%（最低类 86.9%），满足课程「≥ 20 个有效用例、Service 行覆盖率 ≥ 60%、"
+     "≥ 3 个 Controller 测试」要求；JaCoCo 门禁（整体 ≥ 85%、application 包 ≥ 80%）在 CI 中强制校验。", indent=True)
 doc.add_picture(COVERAGE, width=Cm(14.5))
 doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
 caption("图 9-1  后端测试覆盖率摘要（由 JaCoCo 数据生成）")
@@ -572,6 +579,12 @@ table(
         ["GET /me（退出后旧令牌）", "401 {\"code\":\"SESSION_REVOKED\"}"],
         ["POST /auth/login（错误口令）", "401 {\"code\":\"INVALID_CREDENTIALS\"}"],
         ["GET /v3/api-docs", "200，12195 bytes"],
+        ["GET /admin/users?sort=username,desc", "200，首条 researcher_b"],
+        ["GET /admin/users?sort=passwordHash", "400 VALIDATION_FAILED"],
+        ["POST /auth/login（连续失败 6 次）", "第 6 次 429 RATE_LIMITED"],
+        ["POST /auth/refresh（伪造 Referer）", "403 FORBIDDEN"],
+        ["GET /admin/audit-events（PI）", "200，仅本人记录（作用域收敛）"],
+        ["GET /h2-console（dev）", "200（仅本地放行；测试/生产 401）"],
     ],
     widths=[8.0, 10.0],
     font_size=9,
@@ -607,6 +620,7 @@ table(
         ["越权漏洞", "每个业务接口都做权限码 + 作用域 + 归属 + 状态四重校验并配负例测试"],
         ["并发状态不一致", "乐观锁 version + 事务内状态守卫 + 冲突 409"],
         ["密钥泄漏", "仅环境变量注入；仓库不含真实密钥；提供 .env.example"],
+        ["限流为进程内实现", "本地演示足够；多实例部署前替换为 Redis 计数（第三阶段）"],
     ],
     widths=[5.6, 11.4],
 )

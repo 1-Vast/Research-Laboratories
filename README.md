@@ -7,6 +7,8 @@
 - 设计文档索引：[初步设计总览](docs/design/00-初步设计总览.md) · [架构设计](docs/design/01-架构设计.md) · [数据库设计](docs/design/02-数据库设计.md) · [权限设计](docs/design/03-权限设计.md) · [接口设计](docs/design/04-接口设计.md) · [实施计划](docs/design/05-实施计划.md)
 - 进展记录：[log/](log/README.md)（按日期归档的开发日志与里程碑状态）
 
+[![CI](https://github.com/1-Vast/Intelligent-Collaborative-Management-Platform-for-Scientific-Research-Laboratories/actions/workflows/ci.yml/badge.svg)](https://github.com/1-Vast/Intelligent-Collaborative-Management-Platform-for-Scientific-Research-Laboratories/actions/workflows/ci.yml)
+
 ![系统架构](docs/assets/architecture.png)
 
 ---
@@ -171,16 +173,18 @@ sequenceDiagram
 | --- | --- |
 | 访客 | 注册（用户名唯一、密码强度后端校验、默认 `RESEARCHER`）、登录 |
 | 所有登录用户 | 查看当前用户与权限、退出登录（服务端吊销）、刷新令牌轮换 |
-| 系统管理员 | 用户分页/搜索、创建、编辑、启用/禁用、分配角色、逻辑删除；角色增删改查、分配权限；权限目录查询 |
-| 审计（管理员） | 登录、注册、用户/角色变更写入 `audit_events` |
+| 系统管理员 | 用户分页/搜索/排序、创建、编辑、启用/禁用、分配角色、逻辑删除；角色增删改查、分配权限；权限目录查询；审计日志查询 |
+| 审计查看者（`audit:read`） | 管理员看全部脱敏记录；PI 仅看到与本人相关的记录 |
+| 安全防护 | 登录失败限流（5 次 / 10 分钟 → 429）、Cookie 接口来源校验、越权与登录失败独立落库审计、数据库控制台仅 dev 放行 |
 
 ### 7.2 已知未完成（如实列出）
 
 - 项目、任务、周报、资源预约、成果知识、通知、AI 周报等业务接口属第二、三阶段，**当前仓库尚未实现**；
-- 前端仅覆盖登录、注册、工作台、用户管理、角色权限 5 个页面，业务页面待第二阶段；
+- 前端覆盖登录、注册、工作台、用户管理、角色权限、审计日志 6 个页面，业务页面待第二阶段；
 - 未做浏览器 E2E、Docker Compose、Redis / MinIO / WebSocket（第三阶段）；
 - `lab_members`、`labs` 表已建但暂无对应接口（第二阶段随项目作用域实现）；
-- 分页接口暂不支持排序字段白名单（默认按 id 升序）。
+- 登录限流为进程内固定窗口（重启清零、多实例不共享），第三阶段换 Redis 计数；
+- 审计仅覆盖身份与授权相关操作，业务审计随第二、三阶段接口补充。
 
 ## 8. 接口文档
 
@@ -199,16 +203,17 @@ sequenceDiagram
 | POST | `/api/v1/auth/refresh` | 刷新 Cookie |
 | POST | `/api/v1/auth/logout` | 已认证 |
 | GET | `/api/v1/me` | 已认证 |
-| GET/POST | `/api/v1/admin/users` | `user:manage` |
+| GET/POST | `/api/v1/admin/users`（GET 支持 `keyword`、`sort`、`page`、`size`） | `user:manage` |
 | GET/PATCH/DELETE | `/api/v1/admin/users/{id}` | `user:manage` |
 | PATCH | `/api/v1/admin/users/{id}/enabled` | `user:manage` |
 | PUT | `/api/v1/admin/users/{id}/roles` | `user:manage` |
-| GET/POST | `/api/v1/admin/roles` | `role:manage` |
+| GET/POST | `/api/v1/admin/roles`（GET 支持 `keyword`、`sort`、`page`、`size`） | `role:manage` |
 | GET/PATCH/DELETE | `/api/v1/admin/roles/{id}` | `role:manage` |
 | PUT | `/api/v1/admin/roles/{id}/permissions` | `role:manage` |
 | GET | `/api/v1/admin/permissions` | `role:manage` |
+| GET | `/api/v1/admin/audit-events` | `audit:read` |
 
-统一返回：`{code, message, data, traceId}`；分页：`{items, total, page, size}`。
+统一返回：`{code, message, data, traceId}`；分页：`{items, total, page, size}`；排序：`sort=field[,asc|desc]`（白名单字段，非法值 400）；登录失败过多或频繁请求返回 429。
 
 ## 9. 本地运行（15 分钟内可完成）
 
@@ -285,9 +290,10 @@ mvnw.cmd verify      # 生成 JaCoCo 覆盖率报告：target/site/jacoco/index.
 
 ### 11.2 结果（实测）
 
-- **58 个有效用例，全部通过**（接口级 28 个，领域/服务单元 30 个）
-- **整体行覆盖率 86.7%**；Service 层各类 67.9%–93.9%，均 ≥ 60%
-- 覆盖必测场景：注册重名、弱密码、登录成功/失败（统一提示）、**退出后旧令牌 401**、无权限 403、账号禁用、刷新令牌重放、**动态权限生效**、最后一个管理员保护、内置角色/被引用角色删除
+- **87 个有效用例，全部通过**（接口级 47 个，领域/服务单元 40 个）
+- **整体行覆盖率 91.9%**；`identity.application` 包 91.5%（最低类 86.9%），JaCoCo 门禁整体 ≥85%、包 ≥80% 已在 CI 中强制
+- 覆盖必测场景：注册重名、弱密码、登录成功/失败（统一提示）、**退出后旧令牌 401**、无权限 403、账号禁用、刷新令牌重放、**动态权限生效**、最后一个管理员保护、内置角色/被引用角色删除、**登录限流 429**、**来源校验**、**越权与失败登录审计留痕**、排序与分页边界
+- CI：GitHub Actions 每次推送执行 `mvnw verify` + 前端构建，[最近一次运行](https://github.com/1-Vast/Intelligent-Collaborative-Management-Platform-for-Scientific-Research-Laboratories/actions/workflows/ci.yml) 成功
 
 ![覆盖率摘要](docs/assets/coverage-summary.png)
 
@@ -304,7 +310,7 @@ mvnw.cmd verify      # 生成 JaCoCo 覆盖率报告：target/site/jacoco/index.
 | 外部系统（MinIO/SMTP）+1.5 | 未开始 | 第三阶段：附件私有桶、授权下载、邮件提醒 |
 | AI 集成 +1 | 未开始 | 第三阶段：后端适配器 + 授权数据 + 来源校验 |
 | 自动化测试进阶 +1 | 部分（单元/接口测试已达标） | 第三阶段：Playwright E2E + CI |
-| 安全增强 +1 | 部分（刷新轮换、会话吊销、审计表） | 第三阶段：登录限流、审计查询接口 |
+| 安全增强 +1 | **已实现**：刷新令牌轮换与重放吊销、登录失败限流、Cookie 接口来源校验、越权与失败登录审计、审计查询按作用域收敛 | 第三阶段补 Redis 版限流与更多审计维度；是否申请由教师评定 |
 | Redis +0.5 | 未开始 | 第三阶段：吊销标志、缓存、限流 |
 | 部署 +0.5 | 未开始 | 第三阶段：Docker Compose |
 | 无障碍 +0.5 | 部分（表单 label、焦点样式） | 第三阶段：键盘全流程与读屏检查 |
@@ -355,6 +361,7 @@ mvnw.cmd verify      # 生成 JaCoCo 覆盖率报告：target/site/jacoco/index.
 │   ├── testing.md           测试清单与结果
 │   └── prompts.md           AI 使用记录与核心 prompt
 ├── log/                     项目进展日志（按日期归档、里程碑状态、决策与证据）
+├── .github/workflows/       CI：后端 verify（含覆盖率门禁）+ 前端构建
 ├── scripts/                 文档配图与交付文档生成脚本
 ├── .env.example             环境变量模板（无真实密钥）
 └── README.md
