@@ -50,6 +50,7 @@ class AuthServiceTest {
     private final SessionRepository sessions = mock(SessionRepository.class);
     private final RefreshTokenRepository refreshTokens = mock(RefreshTokenRepository.class);
     private final AuditRecorder audit = mock(AuditRecorder.class);
+    private final LoginThrottle loginThrottle = new LoginThrottle(Clock.fixed(NOW, ZoneOffset.UTC));
     private final PasswordEncoder encoder = new BCryptPasswordEncoder();
     private final JwtProperties jwtProperties = new JwtProperties("labflow",
             "unit-test-signing-key-that-is-long-enough-0123456789", Duration.ofMinutes(15), Duration.ofDays(7));
@@ -60,7 +61,7 @@ class AuthServiceTest {
     @BeforeEach
     void setUp() {
         service = new AuthService(users, roles, sessions, refreshTokens, encoder, new PasswordPolicy(8, 64),
-                jwtService, jwtProperties, Clock.fixed(NOW, ZoneOffset.UTC), audit);
+                jwtService, jwtProperties, Clock.fixed(NOW, ZoneOffset.UTC), audit, loginThrottle);
         when(sessions.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(refreshTokens.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(roles.findByCode("RESEARCHER")).thenReturn(Optional.of(researcherRole()));
