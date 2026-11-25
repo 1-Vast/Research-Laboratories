@@ -43,3 +43,6 @@ backend/cp.txt
 *.tmp
 coverage/
 .claude/
+
+# ---- TypeScript 增量构建缓存 ----
+*.tsbuildinfo
