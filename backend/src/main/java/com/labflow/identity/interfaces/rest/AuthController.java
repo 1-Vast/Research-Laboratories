@@ -14,6 +14,7 @@ import com.labflow.shared.error.BusinessException;
 import com.labflow.shared.error.ErrorCode;
 import com.labflow.shared.security.CurrentUser;
 import com.labflow.shared.security.RefreshCookieSupport;
+import com.labflow.shared.security.TrustedOriginValidator;
 import com.labflow.shared.web.TraceContext;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -33,10 +34,13 @@ public class AuthController {
 
     private final AuthService authService;
     private final RefreshCookieSupport cookieSupport;
+    private final TrustedOriginValidator trustedOriginValidator;
 
-    public AuthController(AuthService authService, RefreshCookieSupport cookieSupport) {
+    public AuthController(AuthService authService, RefreshCookieSupport cookieSupport,
+                          TrustedOriginValidator trustedOriginValidator) {
         this.authService = authService;
         this.cookieSupport = cookieSupport;
+        this.trustedOriginValidator = trustedOriginValidator;
     }
 
     @PostMapping("/register")
@@ -59,6 +63,8 @@ public class AuthController {
 
     @PostMapping("/refresh")
     public ResponseEntity<ApiResponse<LoginVo>> refresh(HttpServletRequest httpRequest) {
+        // 刷新依赖浏览器自动携带的 Cookie，先校验来源，防止第三方站点诱导请求
+        trustedOriginValidator.assertTrusted(httpRequest);
         String rawRefreshToken = extractRefreshToken(httpRequest);
         if (rawRefreshToken == null || rawRefreshToken.isBlank()) {
             throw new BusinessException(ErrorCode.TOKEN_INVALID, "缺少刷新令牌");
@@ -70,7 +76,8 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<Void>> logout() {
+    public ResponseEntity<ApiResponse<Void>> logout(HttpServletRequest httpRequest) {
+        trustedOriginValidator.assertTrusted(httpRequest);
         var principal = CurrentUser.require();
         authService.logout(principal.sessionId(), principal.userId());
         return ResponseEntity.status(HttpStatus.NO_CONTENT)

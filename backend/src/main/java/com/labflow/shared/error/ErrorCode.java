@@ -30,6 +30,8 @@ public enum ErrorCode {
     PROTECTED_ROLE(HttpStatus.CONFLICT, "内置角色不允许修改或删除"),
     ROLE_IN_USE(HttpStatus.CONFLICT, "角色仍被用户引用，无法删除"),
 
+    RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "操作过于频繁，请稍后重试"),
+
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "服务器内部错误");
 
     private final HttpStatus status;

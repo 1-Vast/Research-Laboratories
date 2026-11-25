@@ -47,11 +47,12 @@ public class AuthService {
     private final JwtProperties jwtProperties;
     private final Clock clock;
     private final AuditRecorder audit;
+    private final LoginThrottle loginThrottle;
 
     public AuthService(UserRepository users, RoleRepository roles, SessionRepository sessions,
                        RefreshTokenRepository refreshTokens, PasswordEncoder passwordEncoder,
                        PasswordPolicy passwordPolicy, JwtService jwtService, JwtProperties jwtProperties,
-                       Clock clock, AuditRecorder audit) {
+                       Clock clock, AuditRecorder audit, LoginThrottle loginThrottle) {
         this.users = users;
         this.roles = roles;
         this.sessions = sessions;
@@ -62,6 +63,7 @@ public class AuthService {
         this.jwtProperties = jwtProperties;
         this.clock = clock;
         this.audit = audit;
+        this.loginThrottle = loginThrottle;
     }
 
     @Transactional
@@ -85,13 +87,21 @@ public class AuthService {
     @Transactional
     public AuthResult login(LoginCommand command) {
         String username = Usernames.normalize(command.username());
+        // 先做失败次数检查：窗口内失败过多时，即使口令正确也先返回 429
+        loginThrottle.checkAllowed(username, command.clientIp());
+
         User user = users.findByUsername(username).orElse(null);
         String hash = user == null ? DUMMY_HASH : user.passwordHash();
         boolean passwordMatches = passwordEncoder.matches(command.rawPassword(), hash);
         if (user == null || !passwordMatches || !user.enabled()) {
+            loginThrottle.recordFailure(username, command.clientIp());
+            // 拒绝事件独立事务落库：外层抛异常回滚时，失败审计仍然保留
+            audit.recordIndependent(null, "auth.login.failed", "user", null, AuditRecorder.RESULT_DENIED,
+                    "username=" + username);
             // 统一提示，不泄露是“用户不存在”“密码错误”还是“账号禁用”
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
         }
+        loginThrottle.reset(username, command.clientIp());
 
         Instant now = Instant.now(clock);
         AuthSession session = AuthSession.open(user.id(), user.authVersion(), now,
@@ -102,6 +112,8 @@ public class AuthService {
         String rawRefreshToken = TokenHashing.newOpaqueToken();
         refreshTokens.save(RefreshToken.issue(savedSession.id(),
                 TokenHashing.sha256Hex(rawRefreshToken), now, savedSession.expiresAt()));
+        audit.record(user.id(), "auth.login", "session", savedSession.id(), AuditRecorder.RESULT_SUCCESS,
+                "clientIp=" + command.clientIp());
         return new AuthResult(accessToken, jwtService.accessTtlSeconds(), rawRefreshToken, user);
     }
 

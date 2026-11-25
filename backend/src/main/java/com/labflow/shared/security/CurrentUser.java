@@ -12,8 +12,8 @@ public final class CurrentUser {
     }
 
     public static AuthPrincipal require() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !(authentication.getPrincipal() instanceof AuthPrincipal principal)) {
+        AuthPrincipal principal = orNull();
+        if (principal == null) {
             throw new BusinessException(ErrorCode.UNAUTHENTICATED);
         }
         return principal;
@@ -21,5 +21,14 @@ public final class CurrentUser {
 
     public static Long requireUserId() {
         return require().userId();
+    }
+
+    /** 未认证场景（如过滤器层拒绝）返回 null，不抛异常。 */
+    public static AuthPrincipal orNull() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof AuthPrincipal principal)) {
+            return null;
+        }
+        return principal;
     }
 }

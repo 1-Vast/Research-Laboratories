@@ -1,9 +1,13 @@
 package com.labflow.shared.web;
 
+import com.labflow.shared.audit.AuditRecorder;
 import com.labflow.shared.api.ApiResponse;
 import com.labflow.shared.api.FieldErrorItem;
 import com.labflow.shared.error.BusinessException;
 import com.labflow.shared.error.ErrorCode;
+import com.labflow.shared.security.AuthPrincipal;
+import com.labflow.shared.security.CurrentUser;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,6 +34,12 @@ import java.util.List;
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    private final AuditRecorder audit;
+
+    public GlobalExceptionHandler(AuditRecorder audit) {
+        this.audit = audit;
+    }
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusiness(BusinessException ex) {
@@ -67,10 +77,24 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ApiResponse<Void>> handleAccessDenied(AccessDeniedException ex) {
+    public ResponseEntity<ApiResponse<Void>> handleAccessDenied(AccessDeniedException ex,
+                                                               HttpServletRequest request) {
+        recordDeniedAccess(request);
         return ResponseEntity.status(ErrorCode.FORBIDDEN.status())
                 .body(ApiResponse.failure(ErrorCode.FORBIDDEN.name(), ErrorCode.FORBIDDEN.defaultMessage(), null,
                         TraceContext.currentTraceId()));
+    }
+
+    /** 越权访问必须留痕：用独立事务写入，避免被外层异常回滚。 */
+    private void recordDeniedAccess(HttpServletRequest request) {
+        try {
+            AuthPrincipal principal = CurrentUser.orNull();
+            audit.recordIndependent(principal == null ? null : principal.userId(),
+                    "security.access.denied", "endpoint", request.getRequestURI(),
+                    AuditRecorder.RESULT_DENIED, "method=" + request.getMethod());
+        } catch (RuntimeException auditFailure) {
+            log.warn("无法写入越权访问审计: {}", auditFailure.getMessage());
+        }
     }
 
     @ExceptionHandler(AuthenticationException.class)
