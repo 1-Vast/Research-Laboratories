@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    # 测试使用内存库，每次上下文重建即为干净库；Flyway 仍执行真实迁移脚本，验证 DDL 可用
+    url: jdbc:h2:mem:labflow_test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;DEFAULT_NULL_ORDERING=HIGH
+    username: sa
+    password: ''
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none
+  flyway:
+    enabled: true
+    clean-disabled: true
+
+logging:
+  level:
+    com.labflow: WARN
+    org.hibernate.SQL: WARN
+
+labflow:
+  jwt:
+    signing-key: test-only-signing-key-at-least-32-bytes-long-0123456789
