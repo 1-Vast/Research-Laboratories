@@ -143,13 +143,17 @@ def build_coverage_image(rows):
     print("coverage image written, overall", round(overall, 1))
 
 
-def build_architecture_image():
+def build_architecture_image(rows):
     width, height = 1100, 760
     img = Image.new("RGB", (width, height), (250, 252, 254))
     draw = ImageDraw.Draw(img)
 
-    draw.text((40, 32), "LabFlow 系统架构（第一阶段）", font=font(28, True), fill=INK)
-    draw.text((40, 74), "前后端分离 · DDD 模块化单体 · JWT + 服务端会话 · RBAC 动态授权",
+    total_cov = sum(r[2] for r in rows)
+    total_miss = sum(r[3] for r in rows)
+    overall = 100.0 * total_cov / (total_cov + total_miss) if total_cov else 0.0
+
+    draw.text((40, 32), "LabFlow 系统架构", font=font(28, True), fill=INK)
+    draw.text((40, 74), "前后端分离 · DDD 模块化单体 · JWT + 服务端会话 · 角色能力 + 实验室/项目作用域",
               font=font(15), fill=MUTED)
 
     # browser + frontend
@@ -161,13 +165,14 @@ def build_architecture_image():
     # backend container
     rounded(draw, (360, 120, 800, 560), 16, (255, 255, 255), BRAND, 3)
     draw.text((382, 136), "Spring Boot 3.4 模块化单体", font=font(17, True), fill=BRAND)
+    draw.text((382, 160), "shared · identity · research", font=font(12), fill=MUTED)
 
     layers = [
         ("Security Filter Chain", "JWT 认证 · 会话校验 · 方法级授权", 182),
         ("Interfaces 接口层", "Controller · DTO 校验 · VO 映射", 262),
-        ("Application 应用层", "用例编排 · 事务边界 · 事件/审计", 342),
-        ("Domain 领域层", "聚合 · 状态机 · 仓储端口", 422),
-        ("Infrastructure 基础设施层", "JPA 适配器 · 外部服务端口实现", 502),
+        ("Application 应用层", "用例编排 · 作用域校验 · 事务与审计", 342),
+        ("Domain 领域层", "聚合 · 三条状态机 · 仓储端口", 422),
+        ("Infrastructure 基础设施层", "JPA 适配器 · 只读目录 · 外部服务端口", 502),
     ]
     for title, desc, top in layers:
         rounded(draw, (385, top, 775, top + 58), 10, BRAND_LIGHT, BORDER, 1)
@@ -191,7 +196,8 @@ def build_architecture_image():
 
     # test / docs
     rounded(draw, (40, 380, 300, 470), 12, BG)
-    centered(draw, (40, 380, 300, 470), "JUnit 5 + Mockito\nMockMvc + JaCoCo\n58 用例 / 86.7%", font(14))
+    centered(draw, (40, 380, 300, 470),
+             f"JUnit 5 + Mockito\nMockMvc + JaCoCo\n{count_tests()} 用例 / {overall:.1f}%", font(14))
     rounded(draw, (40, 500, 300, 560), 12, BG)
     centered(draw, (40, 500, 300, 560), "Swagger UI\n/v3/api-docs", font(14))
 
@@ -207,5 +213,6 @@ def build_architecture_image():
 
 
 if __name__ == "__main__":
-    build_coverage_image(read_coverage())
-    build_architecture_image()
+    coverage_rows = read_coverage()
+    build_coverage_image(coverage_rows)
+    build_architecture_image(coverage_rows)
