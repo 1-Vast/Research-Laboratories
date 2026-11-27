@@ -67,12 +67,34 @@ def read_coverage():
     return rows
 
 
+def count_tests():
+    """从 Surefire 报告里读真实用例数，避免图片上的数字写死后与代码脱节。"""
+    report_dir = os.path.join(ROOT, "backend", "target", "surefire-reports")
+    total = 0
+    if not os.path.isdir(report_dir):
+        return total
+    import xml.etree.ElementTree as ET
+    for name in os.listdir(report_dir):
+        if not name.endswith(".xml"):
+            continue
+        try:
+            root = ET.parse(os.path.join(report_dir, name)).getroot()
+        except ET.ParseError:
+            continue
+        total += int(root.get("tests", "0"))
+    return total
+
+
 def build_coverage_image(rows):
     services = [r for r in rows if r[1] in {
         "AuthService", "UserAdminService", "RoleAdminService", "AccessTokenAuthenticator",
-        "LoginThrottle", "AuditQueryService", "JwtService", "PasswordPolicy", "User", "Role"}]
+        "LoginThrottle", "AuditQueryService", "JwtService", "PasswordPolicy", "User", "Role",
+        "ProjectService", "TaskService", "ReportService", "ProjectScopeService",
+        "Project", "Task", "Report"}]
     order = ["AuthService", "AccessTokenAuthenticator", "LoginThrottle", "JwtService", "User", "Role",
-             "PasswordPolicy", "AuditQueryService", "RoleAdminService", "UserAdminService"]
+             "PasswordPolicy", "AuditQueryService", "RoleAdminService", "UserAdminService",
+             "Project", "Task", "Report", "ProjectScopeService",
+             "ProjectService", "TaskService", "ReportService"]
     services.sort(key=lambda r: order.index(r[1]) if r[1] in order else 99)
 
     total_cov = sum(r[2] for r in rows)
@@ -87,7 +109,8 @@ def build_coverage_image(rows):
     draw = ImageDraw.Draw(img)
 
     draw.text((40, 30), "LabFlow 后端测试覆盖率摘要", font=font(26, True), fill=INK)
-    draw.text((40, 72), f"来源：JaCoCo 0.8.12 · 102 个用例全部通过 · 整体行覆盖率 {overall:.1f}%",
+    draw.text((40, 72),
+              f"来源：JaCoCo 0.8.12 · {count_tests()} 个用例全部通过 · 整体行覆盖率 {overall:.1f}%",
               font=font(15), fill=MUTED)
 
     cols = [40, 330, 560, 760]
@@ -112,7 +135,8 @@ def build_coverage_image(rows):
         y = draw_row(y, cls, cov, miss, pct)
 
     y = draw_row(y, "全部类合计", total_cov, total_miss, overall, strong=True)
-    draw.text((40, y + 10), "Service / Application 层均 ≥ 60%，且由 JaCoCo check 在 CI 中强制校验。",
+    draw.text((40, y + 10),
+              "门禁：整体行覆盖率 ≥ 85%、identity.application 包 ≥ 80%，由 JaCoCo check 在 verify 阶段强制。",
               font=font(13), fill=MUTED)
 
     img.save(os.path.join(ASSETS, "coverage-summary.png"))

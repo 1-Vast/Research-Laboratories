@@ -266,6 +266,6 @@ python scripts/e2e_smoke.py
 ## 7. 覆盖率口径
 
 JaCoCo 统计 `LINE_COVERED / (LINE_COVERED + LINE_MISSED)`，排除启动类、DTO/VO 与 JPA 实体，配置见 `backend/pom.xml`。
-门禁规则：`BUNDLE` 行覆盖率 ≥ 0.85。
+门禁规则两条：`BUNDLE` 行覆盖率 ≥ 0.85；包 `com/labflow/identity/application` 行覆盖率 ≥ 0.80（身份模块是安全核心，单独加严）。
 
 > 覆盖率是门禁不是目标。第二阶段每加一个模块都先掉覆盖率（B1 后 69%、B2 后 81%），靠补测试拉回 92.8%——这个波动本身说明门禁在起作用，而不是数字好看。
