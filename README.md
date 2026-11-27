@@ -5,6 +5,7 @@
 - 技术栈：**Vue 3 + TypeScript / Spring Boot 3.4 / Spring Security + JWT / PostgreSQL（本地 H2）**
 - 当前进度：**第二阶段（科研业务闭环）已完成**——项目立项/结项、任务分派/交付/验收、周报三条工作流前后端打通，`mvn verify` 258 个用例全绿、行覆盖率 92.8%，真实 HTTP 端到端冒烟 72 项断言全通过
 - 设计文档索引：[初步设计总览](docs/design/00-初步设计总览.md) · [架构设计](docs/design/01-架构设计.md) · [数据库设计](docs/design/02-数据库设计.md) · [权限设计](docs/design/03-权限设计.md) · [接口设计](docs/design/04-接口设计.md) · [实施计划](docs/design/05-实施计划.md)
+- 演示与验证：[演示脚本](docs/演示脚本.md)（8 分钟走完全链路，含越权负例与讲解要点） · [测试说明](docs/testing.md)
 - 进展记录：[log/](log/README.md)（按日期归档的开发日志与里程碑状态）
 
 [![CI](https://github.com/1-Vast/Research-Laboratories/actions/workflows/ci.yml/badge.svg)](https://github.com/1-Vast/Research-Laboratories/actions/workflows/ci.yml)
@@ -33,14 +34,16 @@
 
 ## 2. 团队与分工表
 
-> ⚠️ 请按真实情况填写后再提交；分工必须与 Git 提交记录一致。
+> ⚠️ 姓名、学号、贡献比例**必须由本人按真实情况填写**，分工需与 Git 提交记录一致。
 
 | 姓名 | 学号 | 负责模块 | 主要文件/目录 | 贡献比例 |
 | --- | --- | --- | --- | --- |
-| 待填写 | 待填写 | 身份与授权（认证、RBAC）、数据库设计、工程规范 | `backend/src/main/java/com/labflow/identity/**`、`backend/src/main/resources/db/migration/**`、`docs/design/02-数据库设计.md` | 待填写 |
-| 待填写 | 待填写 | 前端页面、测试、业务模块（第二/三阶段） | `frontend/src/**`、`backend/src/test/**`、`docs/testing.md` | 待填写 |
+| 待填写 | 待填写 | 身份与授权（认证、RBAC）、工程规范、CI | `backend/src/main/java/com/labflow/identity/**`、`backend/src/main/resources/db/migration/V1__schema.sql`、`V2__seed_data.sql`、`.github/workflows/ci.yml` | 待填写 |
+| 待填写 | 待填写 | 科研业务模块（项目/任务/周报）、前端业务页、端到端验证、文档校准 | `backend/src/main/java/com/labflow/research/**`、`backend/src/main/resources/db/migration/V3__research_core.sql`、`frontend/src/views/{Projects,ProjectDetail,Tasks,Reports}View.vue`、`frontend/src/api/research.ts`、`scripts/e2e_smoke.py`、`docs/**` | 待填写 |
 
 > 若为 1 人组，请改为单人 100% 并注明；2 人组需保证每人都有后端业务代码与测试代码的提交。
+>
+> 当前提交分布（`git log --format='%ae' | sort | uniq -c`）：`13757415854@163.com` 30 次、`1978543960@qq.com` 9 次。**请按实际写比例**，不要为了好看凑成 50/50——评审会对着 `git shortlog -sn` 看。
 
 ## 3. 技术栈与实际版本
 
@@ -480,6 +483,7 @@ python scripts/e2e_smoke.py                                             # 终端
 ├── docs/
 │   ├── design/              初步设计（总览、架构、数据库、权限、接口、计划）
 │   ├── assets/              架构图、覆盖率摘要
+│   ├── 演示脚本.md          答辩演示流程、负例与讲解要点
 │   ├── testing.md           测试清单与结果
 │   └── prompts.md           AI 使用记录与核心 prompt
 ├── log/                     项目进展日志（按日期归档、里程碑状态、决策与证据）
