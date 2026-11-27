@@ -3,14 +3,18 @@ package com.labflow.research.interfaces.rest;
 import com.labflow.research.domain.Project;
 import com.labflow.research.domain.ProjectMember;
 import com.labflow.research.domain.ProjectReview;
+import com.labflow.research.domain.Report;
 import com.labflow.research.domain.Task;
 import com.labflow.research.domain.TaskSubmission;
 import com.labflow.research.interfaces.rest.vo.ProgressVo;
 import com.labflow.research.interfaces.rest.vo.ProjectMemberVo;
 import com.labflow.research.interfaces.rest.vo.ProjectReviewVo;
 import com.labflow.research.interfaces.rest.vo.ProjectVo;
+import com.labflow.research.interfaces.rest.vo.ReportVo;
 import com.labflow.research.interfaces.rest.vo.TaskSubmissionVo;
 import com.labflow.research.interfaces.rest.vo.TaskVo;
+
+import java.util.List;
 
 /** 科研业务领域对象到返回体的映射。 */
 public final class ResearchWebMapper {
@@ -49,5 +53,12 @@ public final class ResearchWebMapper {
                 submission.submissionNo(), submission.content(), submission.reviewStatus(),
                 submission.reviewerId(), submission.reviewNote(), submission.reviewedAt(),
                 submission.createdAt());
+    }
+
+    public static ReportVo toReportVo(Report report, List<Long> taskIds) {
+        return new ReportVo(report.id(), report.projectId(), report.authorId(), report.weekStart(),
+                report.work(), report.blockers(), report.nextPlan(), report.status(), report.reviewerId(),
+                report.reviewNote(), report.version(), report.createdAt(), report.updatedAt(),
+                taskIds == null ? List.of() : taskIds);
     }
 }
