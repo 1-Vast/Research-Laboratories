@@ -22,6 +22,8 @@ async function handleLogout() {
     <span class="brand">LabFlow</span>
     <nav>
       <RouterLink to="/workbench" active-class="active">工作台</RouterLink>
+      <RouterLink v-if="hasPermission('project:read')" to="/projects" active-class="active">科研项目</RouterLink>
+      <RouterLink v-if="hasPermission('task:read')" to="/tasks" active-class="active">我的任务</RouterLink>
       <RouterLink v-if="hasPermission('user:manage')" to="/admin/users" active-class="active">
         用户管理
       </RouterLink>

@@ -313,6 +313,23 @@ class ProjectApiTest extends ApiTestSupport {
     }
 
     @Test
+    @DisplayName("实验室列表只返回自己加入的实验室，不暴露全平台组织架构")
+    void myLabsAreScoped() throws Exception {
+        String outsider = login(RESEARCHER_B, DEMO_PASSWORD);
+        mockMvc.perform(get("/api/v1/labs")
+                        .header("Authorization", "Bearer " + outsider))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].code").value("LAB-B"));
+
+        String leader = login(LEADER, DEMO_PASSWORD);
+        mockMvc.perform(get("/api/v1/labs")
+                        .header("Authorization", "Bearer " + leader))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].code").value("LAB-A"));
+    }
+
+    @Test
     @DisplayName("PI 能看到本实验室全部项目，即使不是项目成员")
     void piSeesLabProjects() throws Exception {
         String leader = login(LEADER, DEMO_PASSWORD);
