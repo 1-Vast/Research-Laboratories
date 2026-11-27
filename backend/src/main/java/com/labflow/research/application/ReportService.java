@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -77,6 +78,15 @@ public class ReportService {
     public List<Long> taskIds(Long id, Long actorId) {
         Report report = get(id, actorId);
         return reports.findTaskIds(report.id());
+    }
+
+    /**
+     * 批量取整页周报的关联任务，供列表接口一次性填充 {@code taskIds}。
+     * <p>列表接口若直接返回空集合，前端编辑草稿周报时会把已有任务关联清空——这是静默丢数据。</p>
+     */
+    @Transactional(readOnly = true)
+    public Map<Long, List<Long>> taskIdsOf(List<Long> reportIds) {
+        return reports.findTaskIdsByReports(reportIds);
     }
 
     @Transactional

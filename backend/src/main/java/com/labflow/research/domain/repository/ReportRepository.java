@@ -7,6 +7,7 @@ import com.labflow.shared.api.SortSpec;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /** 周报仓储端口。 */
@@ -26,4 +27,10 @@ public interface ReportRepository {
     void linkTasks(Long reportId, List<Long> taskIds);
 
     List<Long> findTaskIds(Long reportId);
+
+    /**
+     * 批量取关联任务，返回 reportId → taskIds。
+     * <p>列表页必须用它：逐条调用 {@link #findTaskIds} 会随页大小线性放大查询次数。</p>
+     */
+    Map<Long, List<Long>> findTaskIdsByReports(List<Long> reportIds);
 }

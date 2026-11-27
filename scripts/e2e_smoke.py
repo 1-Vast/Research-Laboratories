@@ -13,6 +13,10 @@ PASSWORD = "Labflow@2026"
 passed = []
 failed = []
 
+# 本机访问必须绕过 HTTP 代理：环境里若设了 http_proxy/HTTP_PROXY，
+# urllib 会把 127.0.0.1 也发给代理，得到 502 而不是应用响应。
+_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
 
 def call(method, path, token=None, body=None):
     url = BASE + path
@@ -22,12 +26,15 @@ def call(method, path, token=None, body=None):
     if token:
         req.add_header("Authorization", "Bearer " + token)
     try:
-        with urllib.request.urlopen(req) as resp:
+        with _OPENER.open(req) as resp:
             raw = resp.read().decode("utf-8")
             return resp.status, (json.loads(raw) if raw else None)
     except urllib.error.HTTPError as err:
         raw = err.read().decode("utf-8")
-        return err.code, (json.loads(raw) if raw else None)
+        try:
+            return err.code, (json.loads(raw) if raw else None)
+        except json.JSONDecodeError:
+            return err.code, {"raw": raw}
 
 
 def check(name, actual, expected):
@@ -183,6 +190,8 @@ status, body = call("POST", f"/projects/{project_id}/reports", researcher,
 check("建周报 201", status, 201)
 report_id = body["data"]["id"]
 check("周起始归一到周一", body["data"]["weekStart"], "2026-11-23")
+status, body = call("GET", f"/projects/{project_id}/reports", researcher)
+check("列表回显关联任务", body["data"]["items"][0]["taskIds"], [task_id])
 status, body = call("POST", f"/projects/{project_id}/reports", researcher,
                     {"weekStart": "2026-11-27", "work": "重复周报"})
 check("同周重复 409", status, 409)

@@ -305,6 +305,13 @@ class ReportApiTest extends ApiTestSupport {
                         .header("Authorization", "Bearer " + member))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.taskIds[0]").value(taskId));
+
+        // 列表也必须带回 taskIds：前端编辑草稿时直接复用列表行，
+        // 若列表返回空数组，保存时会把已有关联任务清空（静默丢数据）。
+        mockMvc.perform(get("/api/v1/projects/" + projectId + "/reports")
+                        .header("Authorization", "Bearer " + member))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].taskIds[0]").value(taskId));
     }
 
     @Test

@@ -33,11 +33,12 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 周报工作流接口。
  *
- * <p>列表不返回关联任务（避免每行一次查询），详情返回完整 taskIds；
+ * <p>列表按整页批量填充 {@code taskIds}（一次 IN 查询），详情返回完整 taskIds；
  * 需要任务明细时再调 `/tasks/{id}`。</p>
  */
 @RestController
@@ -63,7 +64,11 @@ public class ReportController {
             @Max(value = 100, message = "size 最大为 100") int size) {
         PageResult<Report> result = reportService.list(projectId, authorId, status, page, size, sort,
                 CurrentUser.requireUserId());
-        return ApiResponse.ok(result.map(report -> ResearchWebMapper.toReportVo(report, List.of())),
+        // 整页一次性取回关联任务，避免逐条查询造成 N+1；未关联的周报补空集合。
+        Map<Long, List<Long>> taskIdsByReport = reportService.taskIdsOf(
+                result.items().stream().map(Report::id).toList());
+        return ApiResponse.ok(result.map(report -> ResearchWebMapper.toReportVo(report,
+                        taskIdsByReport.getOrDefault(report.id(), List.of()))),
                 TraceContext.currentTraceId());
     }
 

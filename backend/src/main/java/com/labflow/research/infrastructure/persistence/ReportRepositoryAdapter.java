@@ -13,7 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Repository
 @Transactional(readOnly = true)
@@ -86,5 +88,16 @@ public class ReportRepositoryAdapter implements ReportRepository {
         return reportTasks.findByReportId(reportId).stream()
                 .map(ReportTaskJpaEntity::getTaskId)
                 .toList();
+    }
+
+    @Override
+    public Map<Long, List<Long>> findTaskIdsByReports(List<Long> reportIds) {
+        if (reportIds == null || reportIds.isEmpty()) {
+            return Map.of();
+        }
+        // 一次 IN 查询取回整页关联；空列表的周报不会出现在结果里，由调用方补空集合。
+        return reportTasks.findByReportIdIn(reportIds).stream()
+                .collect(Collectors.groupingBy(ReportTaskJpaEntity::getReportId,
+                        Collectors.mapping(ReportTaskJpaEntity::getTaskId, Collectors.toList())));
     }
 }
