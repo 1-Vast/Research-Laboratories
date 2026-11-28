@@ -271,6 +271,8 @@ python scripts/e2e_smoke.py
 
 第二阶段 CI 中，后端 job 单次耗时约 67 s（含临时 PostgreSQL 实例启动与 Flyway 迁移），前端 job 约 15 s，均在免费额度内完成。
 
+文档同步提交 `ee8ea41` 的复验运行 [46114834523](https://github.com/1-Vast/Research-Laboratories/actions/runs/46114834523) 同样双 job 成功：后端 `运行测试并校验覆盖率`、`上传测试与覆盖率报告` 全部通过，前端 `安装依赖并构建` 通过。
+
 ## 6. 尚未覆盖（如实说明）
 
 - PostgreSQL 集成测试覆盖单实例下的迁移、约束与主链路；**多线程并发审批/提交**等并发用例尚未编写（乐观锁逻辑已由"过期版本 409"用例覆盖，但不是真并发）；
