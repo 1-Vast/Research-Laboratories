@@ -7,7 +7,7 @@
 - 设计文档索引：[初步设计总览](docs/design/00-初步设计总览.md) · [架构设计](docs/design/01-架构设计.md) · [数据库设计](docs/design/02-数据库设计.md) · [权限设计](docs/design/03-权限设计.md) · [接口设计](docs/design/04-接口设计.md) · [实施计划](docs/design/05-实施计划.md)
 - 进展记录：[log/](log/README.md)（按日期归档的开发日志与里程碑状态）
 
-[![CI](https://github.com/1-Vast/Intelligent-Collaborative-Management-Platform-for-Scientific-Research-Laboratories/actions/workflows/ci.yml/badge.svg)](https://github.com/1-Vast/Intelligent-Collaborative-Management-Platform-for-Scientific-Research-Laboratories/actions/workflows/ci.yml)
+[![CI](https://github.com/1-Vast/Research-Laboratories/actions/workflows/ci.yml/badge.svg)](https://github.com/1-Vast/Research-Laboratories/actions/workflows/ci.yml)
 
 ![系统架构](docs/assets/architecture.png)
 
@@ -299,7 +299,7 @@ mvnw.cmd verify      # 生成 JaCoCo 覆盖率报告：target/site/jacoco/index.
 - **真实 PostgreSQL 16 集成测试**：测试启动临时实例，执行与生产完全相同的 Flyway 脚本，验证建表、唯一约束、会话吊销、动态权限与审计
 - **整体行覆盖率 92.2%**；`identity.application` 包 91.9%（最低类 86.9%），JaCoCo 门禁整体 ≥85%、包 ≥80% 已在 CI 中强制
 - 覆盖必测场景：注册重名、弱密码、登录成功/失败（统一提示）、**退出后旧令牌 401**、无权限 403、账号禁用、刷新令牌重放、**动态权限生效**、最后一个管理员保护、内置角色/被引用角色删除、**登录限流 429**、**来源校验**、**越权与失败登录审计留痕**、排序与分页边界
-- CI：GitHub Actions 每次推送执行 `mvnw verify` + 前端构建，[最近一次运行](https://github.com/1-Vast/Intelligent-Collaborative-Management-Platform-for-Scientific-Research-Laboratories/actions/workflows/ci.yml) 成功
+- CI：GitHub Actions 每次推送执行 `mvnw verify` + 前端构建，[最近一次运行](https://github.com/1-Vast/Research-Laboratories/actions/workflows/ci.yml) 成功
 
 ![覆盖率摘要](docs/assets/coverage-summary.png)
 

@@ -19,6 +19,8 @@ https://github.com/1-Vast/Intelligent-Collaborative-Management-Platform-for-Scie
 @doc\期末项目任务书.docx 要求在这边
 ```
 
+> 注：上面的提示词按原文保留（当时仓库名为长名），仓库后续重命名为 `1-Vast/Research-Laboratories`，GitHub 侧仍可通过重定向访问旧地址。
+
 ## 3. 模块级提示词（项目书 §39 定义，本次按此实施）
 
 ### P01 工程搭建与数据库
