@@ -27,7 +27,7 @@ mvnw.cmd verify
 | 领域 / 服务 / 工具单元用例 | 159（身份 42 + 科研领域 36 + 科研服务 76 + 复合主键/映射 5） |
 | 整体行覆盖率 | **92.8%**（2154/2321 行） |
 | 覆盖率门禁 | JaCoCo `check`：整体 ≥ 85% —— 满足 |
-| 端到端冒烟 | 真实 HTTP + 真实 PostgreSQL，19 组 71 项断言全通过 |
+| 端到端冒烟 | 真实 HTTP + 真实 PostgreSQL，19 组 72 项断言全通过 |
 
 **用例分布**
 
@@ -235,10 +235,10 @@ cd backend && mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=dev
 python scripts/e2e_smoke.py
 ```
 
-覆盖 19 组、71 项断言：五账号登录、实验室作用域、项目全生命周期（含负责人自批 403、PI 审批、结项归档）、任务全链路（含退回重提快照历史）、周报（周归一/同周唯一/提交后只读）、越权负例、审批轨迹与审计。
+覆盖 19 组、72 项断言：五账号登录、实验室作用域、项目全生命周期（含负责人自批 403、PI 审批、结项归档）、任务全链路（含退回重提快照历史）、周报（周归一/同周唯一/提交后只读/列表回显关联任务）、越权负例、审批轨迹与审计。
 
 ```text
-通过 71 项，失败 0 项
+通过 72 项，失败 0 项
 ```
 
 首次执行有 4 项失败，均为脚本对状态机的假设错误而非代码缺陷：任务退回后是独立 `RETURNED` 态（不是回到 `IN_PROGRESS`）、退回后须重新 `start` 才能提交、详情接口返回 `{project, progress, members}` 聚合体、`TaskVo` 无 `latestSubmissionNo` 字段。修正后全通过——这正是加这层冒烟的价值：只靠 MockMvc 单测，这些接口形态差异不会被发现，直到前端拿到 `undefined`。
@@ -248,12 +248,28 @@ python scripts/e2e_smoke.py
 - 工作流：`.github/workflows/ci.yml`，在 `push` / `pull_request` 时执行。
 - 后端：`./mvnw -B verify`（本地实测 258 用例，含临时 PostgreSQL 实例 + JaCoCo check），上传 Surefire 与 JaCoCo 报告为 artifact。
 - 前端：`npm ci && npm run build`。
-- 下表的运行记录对应**第一阶段**提交（当时 102 用例）；第二阶段的 258 用例已在本地 `mvn verify` 全绿，待推送后由 CI 复验。
+- 下表的运行记录对应**第一阶段**提交（当时 102 用例）。
+- 第二阶段的 258 用例已推送到六个链式 PR 分支，**GitHub Actions 逐分支复验通过**（见下表 2），与本地 `mvn verify` 结果一致。
+
+**表 1：第一阶段（`main` push）**
 
 | 运行编号 | 触发提交 | 结果 |
 | --- | --- | --- |
 | 45565099683 | docs: 补充演示时限流提示… | 前后端均成功 |
 | 45566994267 | test(postgres) + feat(auth/observability/frontend) | 后端 102 用例（含 PostgreSQL 集成 5.3s）、前端构建均成功 |
+
+**表 2：第二阶段（六个 PR，`pull_request` 事件）**
+
+| 运行编号 | 分支 | 提交 | 后端测试与覆盖率 | 前端构建 |
+| --- | --- | --- | --- | --- |
+| 46113713201 | `chore-toolchain` | `3e652e5` | success | success |
+| 46113725631 | `feat-research-schema` | `49fa8b9` | success | success |
+| 46113741531 | `feat-project-workflow` | `295bac1` | success | success |
+| 46113753000 | `feat-task-workflow` | `42f6b1a` | success | success |
+| 46113767706 | `feat-report-workflow` | `d7f417f` | success | success |
+| 46113955926 | `feat-frontend-research` | `ad012fc` | success | success |
+
+第二阶段 CI 中，后端 job 单次耗时约 67 s（含临时 PostgreSQL 实例启动与 Flyway 迁移），前端 job 约 15 s，均在免费额度内完成。
 
 ## 6. 尚未覆盖（如实说明）
 

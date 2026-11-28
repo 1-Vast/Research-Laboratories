@@ -83,7 +83,9 @@ echo "== 2. 推送分支 =="
 for entry in "${BRANCHES[@]}"; do
   branch="${entry%%|*}"
   printf '  %-26s ' "$branch"
-  git -c http.sslBackend=openssl -c http.version=HTTP/1.1 \
+  # 显式清空 http(s).proxy：本机环境变量里配了代理，但直连 GitHub 反而更稳，
+  # 走代理时 git 会在中途卡住（curl 加 --noproxy 一直正常，说明直连没问题）。
+  git -c http.proxy= -c https.proxy= -c http.sslBackend=openssl -c http.version=HTTP/1.1 \
     push -q "https://x-access-token:${TOKEN}@github.com/${REPO}.git" \
     "refs/heads/${branch}:refs/heads/${branch}" && echo "已推送" || { echo "失败"; exit 1; }
 done
