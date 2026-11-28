@@ -54,7 +54,11 @@ class PostgresApiTest {
 
     @DynamicPropertySource
     static void postgresProperties(DynamicPropertyRegistry registry) throws IOException {
-        postgres = EmbeddedPostgres.builder().start();
+        // 默认等待 10 秒，在 CI 或本机高负载时冷启动 initdb 会超时（Gave up waiting for server to start），
+        // 这里放宽到 120 秒；启动失败仍会明确抛错，不会掩盖真实问题。
+        postgres = EmbeddedPostgres.builder()
+                .setPGStartupWait(java.time.Duration.ofSeconds(120))
+                .start();
         registry.add("spring.datasource.url", () -> postgres.getJdbcUrl("postgres", "postgres"));
         registry.add("spring.datasource.username", () -> "postgres");
         registry.add("spring.datasource.password", () -> "postgres");
@@ -78,14 +82,14 @@ class PostgresApiTest {
     }
 
     @Test
-    @DisplayName("Flyway 在 PostgreSQL 上建出 10 张表与完整种子数据")
+    @DisplayName("Flyway 在 PostgreSQL 上建出 17 张表与完整种子数据")
     void flywayMigratesSchemaOnPostgres() {
         Integer tables = jdbcTemplate.queryForObject("""
                 select count(*) from information_schema.tables
                 where table_schema = 'public' and table_type = 'BASE TABLE'
                   and table_name <> 'flyway_schema_history'
                 """, Integer.class);
-        assertThat(tables).isEqualTo(10);
+        assertThat(tables).isEqualTo(17);
 
         assertThat(count("roles")).isEqualTo(4);
         assertThat(count("permissions")).isEqualTo(49);
@@ -95,7 +99,13 @@ class PostgresApiTest {
                 """, Integer.class);
         assertThat(seededUsers).isEqualTo(5);
         assertThat(count("labs")).isEqualTo(2);
-        assertThat(count("flyway_schema_history")).isGreaterThanOrEqualTo(2);
+        assertThat(count("flyway_schema_history")).isGreaterThanOrEqualTo(3);
+
+        // 第二阶段新增的 7 张业务表必须真实存在（空表也要建出来）
+        for (String table : java.util.List.of("projects", "project_members", "project_reviews",
+                "tasks", "task_submissions", "reports", "report_tasks")) {
+            assertThat(count(table)).isZero();
+        }
     }
 
     @Test
