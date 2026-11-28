@@ -20,14 +20,26 @@ mvnw.cmd verify
 
 | 指标 | 数值 |
 | --- | --- |
-| 有效用例数 | **102** |
+| 有效用例数 | **258** |
 | 失败 / 错误 | 0 |
-| 接口级（MockMvc + 真实过滤器链）用例 | 54（认证 14 + RBAC 14 + 安全加固 10 + 管理维护 9 + 自助改密 7） |
+| 接口级（MockMvc + 真实过滤器链）用例 | 93（身份 54 + 科研 39） |
 | 真实 PostgreSQL 集成用例 | 6（临时拉起的 PostgreSQL 16，执行与生产相同的 Flyway 迁移） |
-| 领域 / 服务单元用例 | 42（认证服务 8、限流 5、请求级认证 5、JWT 6、密码策略 6、聚合 7、排序参数 5） |
-| 整体行覆盖率 | **92.2%** |
-| `identity.application` 包行覆盖率 | 91.9%（最低类 `UserAdminService` 86.9%） |
-| 覆盖率门禁 | JaCoCo `check`：整体 ≥ 85%、application 包 ≥ 80% —— 全部满足 |
+| 领域 / 服务 / 工具单元用例 | 159（身份 42 + 科研领域 36 + 科研服务 76 + 复合主键/映射 5） |
+| 整体行覆盖率 | **92.8%**（2154/2321 行） |
+| 覆盖率门禁 | JaCoCo `check`：整体 ≥ 85% —— 满足 |
+| 端到端冒烟 | 真实 HTTP + 真实 PostgreSQL，19 组 72 项断言全通过 |
+
+**用例分布**
+
+| 测试类 | 用例数 | 层次 |
+| --- | --- | --- |
+| `AuthApiTest` / `RbacApiTest` / `SecurityHardeningApiTest` / `AdminApiTest` / `PasswordChangeApiTest` | 14 / 14 / 10 / 9 / 7 | 身份接口 |
+| `ProjectApiTest` / `TaskApiTest` / `ReportApiTest` | 15 / 13 / 11 | 科研接口 |
+| `PostgresApiTest` | 6 | 真实 PostgreSQL |
+| `ProjectServiceTest` / `TaskServiceTest` / `ReportServiceTest` | 31 / 23 / 22 | 科研应用服务 |
+| `ProjectTest` / `TaskTest` / `ReportTest` | 13 / 12 / 11 | 科研领域状态机 |
+| `AuthServiceTest` / `AccessTokenAuthenticatorTest` / `LoginThrottleTest` / `JwtServiceTest` / `PasswordPolicyTest` / `UserDomainTest` / `SortSpecTest` | 8 / 5 / 5 / 6 / 6 / 7 / 5 | 身份与共享工具 |
+| `CompositeKeyTest` / `ResearchWebMapperTest` | 2 / 3 | 复合主键与 VO 映射 |
 
 ![覆盖率摘要](assets/coverage-summary.png)
 
@@ -117,7 +129,7 @@ mvnw.cmd verify
 | # | 场景 | 关键断言 |
 | --- | --- | --- |
 | 1 | 运行环境确认 | `select version()` 含 PostgreSQL，当前库为 postgres |
-| 2 | Flyway 建表 | 10 张业务表 + `flyway_schema_history`；4 角色 / 49 权限 / 5 演示账号 / 2 实验室 |
+| 2 | Flyway 建表 | **17 张业务表** + `flyway_schema_history`（≥3 条迁移记录）；4 角色 / 49 权限 / 5 演示账号 / 2 实验室；7 张科研表初始为空 |
 | 3 | 认证闭环 | 登录 → `/me` → 退出 204 → 旧令牌 401；会话 `revoked_at` 落库 |
 | 4 | 唯一约束 | 重复用户名 409，数据库中只有一条记录 |
 | 5 | 禁用账号 | 令牌立即 401，`auth_version` 递增 |
@@ -135,40 +147,136 @@ mvnw.cmd verify
 | `UserDomainTest` | 7 | 注册初始状态、禁用/改密递增版本、多角色并集、只读集合、受保护角色、权限替换 |
 | `SortSpecTest` | 5 | 默认升序、字段+方向解析、非法字段、非法方向、多余参数 |
 
-## 4. 手工冒烟记录（真实 HTTP，dev profile）
+## 3.8 科研业务接口（39）
+
+**`ProjectApiTest`（15）**
+
+| # | 场景 | 关键断言 |
+| --- | --- | --- |
+| 1 | 创建草稿 | 201；`DRAFT`；`version=0`；负责人自动写入 `project_members` |
+| 2 | 跨实验室创建 | 403 `LAB_SCOPE_FORBIDDEN` |
+| 3 | 非成员读详情 | 403 `PROJECT_MEMBER_REQUIRED` |
+| 4 | 提交立项 | `PENDING`，`version=1` |
+| 5 | 过期版本提交 | 409 `VERSION_CONFLICT` |
+| 6 | 负责人自批 | 403（无 `project:approve` 权限码） |
+| 7 | PI 审批 | `ACTIVE`；审批轨迹 +1 |
+| 8 | 驳回无理由 | 400 `VALIDATION_FAILED` |
+| 9 | 驳回后重开再提交 | `REJECTED` → `DRAFT` → `PENDING` |
+| 10 | 草稿态加成员 | 409（成员维护只在进行中开放） |
+| 11 | 加非同实验室成员 | 400 |
+| 12 | 删除非草稿项目 | 409 `PROJECT_NOT_DELETABLE` |
+| 13 | PI 可见性 | 本实验室 PI 能读详情，跨实验室 PI 403 |
+| 14 | 结项存在未完成任务 | 409 `OPEN_TASKS_EXIST` |
+| 15 | `GET /labs` 作用域 | 只返回本人所属实验室 |
+
+**`TaskApiTest`（13）**
+
+| # | 场景 | 关键断言 |
+| --- | --- | --- |
+| 1 | 草稿项目建任务 | 409 `INVALID_STATE_TRANSITION` |
+| 2 | 非负责人建任务 | 403 `PROJECT_LEADER_REQUIRED` |
+| 3 | 受派人非项目成员 | 400 |
+| 4 | 受派人开始 | `IN_PROGRESS` |
+| 5 | 非受派人开始 | 403 |
+| 6 | 提交生成快照 | `SUBMITTED`；`/submissions` 1 条 |
+| 7 | 退回后重提 | 2 条快照，旧内容未被覆盖 |
+| 8 | 退回态直接提交 | 409 |
+| 9 | 验收通过 | `DONE`；快照 `APPROVED` |
+| 10 | 自己验收自己 | 403 `SELF_REVIEW_FORBIDDEN` |
+| 11 | 取消任务 | `CANCELED`；不计入进度 |
+| 12 | 进度统计 | `done/total` 与 `percent` 正确 |
+| 13 | 越权读取他项目任务 | 403 |
+
+**`ReportApiTest`（11）**
+
+| # | 场景 | 关键断言 |
+| --- | --- | --- |
+| 1 | 建周报 | 201；`weekStart` 归一到周一 |
+| 2 | 同周重复 | 409 `DUPLICATE_REPORT_WEEK` |
+| 3 | 提交后改正文 | 409 |
+| 4 | 提交周报 | `SUBMITTED` |
+| 5 | 审核通过 | `APPROVED` |
+| 6 | 审核退回无意见 | 400 |
+| 7 | 退回后修改重提 | `RETURNED` → `DRAFT` → `SUBMITTED` |
+| 8 | 审核自己的周报 | 403 `SELF_REVIEW_FORBIDDEN` |
+| 9 | 关联跨项目任务 | 400 `VALIDATION_FAILED` |
+| 10 | 删除已提交周报 | 409 `REPORT_NOT_DELETABLE` |
+| 11 | 非成员读取 | 403 |
+
+## 3.9 科研领域状态机（36）
+
+| 测试类 | 数量 | 覆盖点 |
+| --- | --- | --- |
+| `ProjectTest` | 13 | 五态迁移合法性、驳回理由必填、自审拦截、结项退回、归档后不可再改、`version` 递增、删除限制 |
+| `TaskTest` | 12 | `TODO`/`RETURNED` 两个开始入口、非 `IN_PROGRESS` 不可提交、受派人边界、退回必填理由、取消规则、`countsForProgress` |
+| `ReportTest` | 11 | 周起始归一（周三→周一、周一保持）、提交后只读、退回重开、自审拦截、删除限制 |
+
+## 3.10 科研应用服务（76）
+
+| 测试类 | 数量 | 覆盖点 |
+| --- | --- | --- |
+| `ProjectServiceTest` | 31 | 创建/查询/修改/删除分支、作用域拒绝、版本冲突、审批轨迹写入、成员增删边界、审计记录 |
+| `TaskServiceTest` | 23 | 越权读取、负责人边界、快照编号递增、审核回写快照、进度与结项联动 |
+| `ReportServiceTest` | 22 | 作者边界、自审拦截、同周唯一（服务层预检）、关联任务同项目校验、审核意见落库 |
+
+## 3.11 复合主键与 VO 映射（5）
+
+| 测试类 | 数量 | 覆盖点 |
+| --- | --- | --- |
+| `CompositeKeyTest` | 2 | `ProjectMemberId` / `ReportTaskId` 的 `equals`/`hashCode` —— JPA 一级缓存按主键判等，写错会导致实体"消失"或重复插入 |
+| `ResearchWebMapperTest` | 3 | VO 字段逐个映射，防止前端静默拿到 `null` |
+
+## 4. 端到端冒烟（真实 HTTP + 真实数据库）
+
+脚本 `scripts/e2e_smoke.py`，标准库实现，不引入额外依赖。执行前先起 dev 服务：
+
+```bash
+cd backend && mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=dev
+python scripts/e2e_smoke.py
+```
+
+覆盖 19 组、72 项断言：五账号登录、实验室作用域、项目全生命周期（含负责人自批 403、PI 审批、结项归档）、任务全链路（含退回重提快照历史）、周报（周归一/同周唯一/提交后只读/列表回显关联任务）、越权负例、审批轨迹与审计。
 
 ```text
-GET  /actuator/health                        -> 200 {"status":"UP"}
-POST /api/v1/auth/login (admin_demo)         -> 200, 权限 7 项
-GET  /api/v1/admin/users?page=1&size=3       -> 200, total=5
-GET  /api/v1/admin/users?sort=username,desc  -> 200, 首条 researcher_b、末条 admin_demo
-GET  /api/v1/admin/users?sort=passwordHash   -> 400 VALIDATION_FAILED
-GET  /api/v1/admin/audit-events?size=5       -> 200, total=3, 首条 auth.login/SUCCESS
-POST /api/v1/auth/login（同一账号连续失败 6 次）-> 第 6 次 429 RATE_LIMITED
-POST /api/v1/auth/refresh（Referer: evil）    -> 403 FORBIDDEN
-GET  /api/v1/admin/users（researcher）        -> 403；审计新增 security.access.denied，actor=4
-GET  /api/v1/admin/audit-events（pi_demo）    -> 200, 仅本人 1 条记录（作用域收敛）
-GET  /h2-console（dev profile）               -> 200（仅本地开发放行）
-GET  /api/v1/me（退出后旧令牌）                -> 401 {"code":"SESSION_REVOKED"}
-POST /api/v1/auth/login（错误口令）            -> 401 {"code":"INVALID_CREDENTIALS"}
+通过 72 项，失败 0 项
 ```
+
+首次执行有 4 项失败，均为脚本对状态机的假设错误而非代码缺陷：任务退回后是独立 `RETURNED` 态（不是回到 `IN_PROGRESS`）、退回后须重新 `start` 才能提交、详情接口返回 `{project, progress, members}` 聚合体、`TaskVo` 无 `latestSubmissionNo` 字段。修正后全通过——这正是加这层冒烟的价值：只靠 MockMvc 单测，这些接口形态差异不会被发现，直到前端拿到 `undefined`。
 
 ## 5. CI 证据
 
 - 工作流：`.github/workflows/ci.yml`，在 `push` / `pull_request` 时执行。
-- 后端：`./mvnw -B verify`（102 用例，含临时 PostgreSQL 实例 + JaCoCo check），上传 Surefire 与 JaCoCo 报告为 artifact。
+- 后端：`./mvnw -B verify`（本地实测 258 用例，含临时 PostgreSQL 实例 + JaCoCo check），上传 Surefire 与 JaCoCo 报告为 artifact。
 - 前端：`npm ci && npm run build`。
-- 最近一次 `main` 运行：**成功**（运行编号见下）。
+- 下表的运行记录对应**第一阶段**提交（当时 102 用例）。
+- 第二阶段的 258 用例已推送到六个链式 PR 分支，**GitHub Actions 逐分支复验通过**（见下表 2），与本地 `mvn verify` 结果一致。
+
+**表 1：第一阶段（`main` push）**
 
 | 运行编号 | 触发提交 | 结果 |
 | --- | --- | --- |
 | 45565099683 | docs: 补充演示时限流提示… | 前后端均成功 |
 | 45566994267 | test(postgres) + feat(auth/observability/frontend) | 后端 102 用例（含 PostgreSQL 集成 5.3s）、前端构建均成功 |
 
+**表 2：第二阶段（六个 PR，`pull_request` 事件）**
+
+| 运行编号 | 分支 | 提交 | 后端测试与覆盖率 | 前端构建 |
+| --- | --- | --- | --- | --- |
+| 46113713201 | `chore-toolchain` | `3e652e5` | success | success |
+| 46113725631 | `feat-research-schema` | `49fa8b9` | success | success |
+| 46113741531 | `feat-project-workflow` | `295bac1` | success | success |
+| 46113753000 | `feat-task-workflow` | `42f6b1a` | success | success |
+| 46113767706 | `feat-report-workflow` | `d7f417f` | success | success |
+| 46113955926 | `feat-frontend-research` | `ad012fc` | success | success |
+
+第二阶段 CI 中，后端 job 单次耗时约 67 s（含临时 PostgreSQL 实例启动与 Flyway 迁移），前端 job 约 15 s，均在免费额度内完成。
+
+文档同步提交 `ee8ea41` 的复验运行 [46114834523](https://github.com/1-Vast/Research-Laboratories/actions/runs/46114834523) 同样双 job 成功：后端 `运行测试并校验覆盖率`、`上传测试与覆盖率报告` 全部通过，前端 `安装依赖并构建` 通过。
+
 ## 6. 尚未覆盖（如实说明）
 
-- PostgreSQL 集成测试覆盖单实例下的迁移、约束与主链路；**多线程并发审批/预约**等并发用例留给第二阶段（需要业务状态机就绪）；
-- 未做浏览器 E2E（接口契约由 MockMvc 覆盖，E2E 列为第三阶段附加项）；
+- PostgreSQL 集成测试覆盖单实例下的迁移、约束与主链路；**多线程并发审批/提交**等并发用例尚未编写（乐观锁逻辑已由"过期版本 409"用例覆盖，但不是真并发）；
+- 未做浏览器 E2E（Playwright 等），端到端验证通过真实 HTTP 脚本完成，**不覆盖前端渲染与交互**；
 - 未做压力测试、Redis 失效回退、WebSocket 认证等第三阶段内容；
 - 登录限流为**进程内固定窗口**实现（重启清零、多实例不共享），第三阶段替换为 Redis 计数；
 - 访问日志只记录方法、路径、状态、耗时与用户名，不记录请求体、查询串和令牌。
@@ -176,4 +284,6 @@ POST /api/v1/auth/login（错误口令）            -> 401 {"code":"INVALID_CRE
 ## 7. 覆盖率口径
 
 JaCoCo 统计 `LINE_COVERED / (LINE_COVERED + LINE_MISSED)`，排除启动类、DTO/VO 与 JPA 实体，配置见 `backend/pom.xml`。
-门禁规则：`BUNDLE` 行覆盖率 ≥ 0.85；包 `com/labflow/identity/application` 行覆盖率 ≥ 0.80。
+门禁规则两条：`BUNDLE` 行覆盖率 ≥ 0.85；包 `com/labflow/identity/application` 行覆盖率 ≥ 0.80（身份模块是安全核心，单独加严）。
+
+> 覆盖率是门禁不是目标。第二阶段每加一个模块都先掉覆盖率（B1 后 69%、B2 后 81%），靠补测试拉回 92.8%——这个波动本身说明门禁在起作用，而不是数字好看。

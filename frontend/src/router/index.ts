@@ -5,6 +5,10 @@ import WorkbenchView from '../views/WorkbenchView.vue'
 import UsersView from '../views/UsersView.vue'
 import RolesView from '../views/RolesView.vue'
 import AuditView from '../views/AuditView.vue'
+import ProjectsView from '../views/ProjectsView.vue'
+import ProjectDetailView from '../views/ProjectDetailView.vue'
+import TasksView from '../views/TasksView.vue'
+import ReportsView from '../views/ReportsView.vue'
 import { authState, clearAuth, hasPermission, setToken, setUser } from '../stores/auth'
 import { fetchMe, tryRefresh } from '../api/auth'
 
@@ -15,6 +19,30 @@ const router = createRouter({
     { path: '/login', name: 'login', component: LoginView, meta: { public: true } },
     { path: '/register', name: 'register', component: RegisterView, meta: { public: true } },
     { path: '/workbench', name: 'workbench', component: WorkbenchView },
+    {
+      path: '/projects',
+      name: 'projects',
+      component: ProjectsView,
+      meta: { permission: 'project:read' },
+    },
+    {
+      path: '/projects/:id',
+      name: 'project-detail',
+      component: ProjectDetailView,
+      meta: { permission: 'project:read' },
+    },
+    {
+      path: '/tasks',
+      name: 'tasks',
+      component: TasksView,
+      meta: { permission: 'task:read' },
+    },
+    {
+      path: '/reports',
+      name: 'reports',
+      component: ReportsView,
+      meta: { permission: 'report:read' },
+    },
     {
       path: '/admin/users',
       name: 'admin-users',

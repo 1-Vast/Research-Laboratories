@@ -67,12 +67,34 @@ def read_coverage():
     return rows
 
 
+def count_tests():
+    """从 Surefire 报告里读真实用例数，避免图片上的数字写死后与代码脱节。"""
+    report_dir = os.path.join(ROOT, "backend", "target", "surefire-reports")
+    total = 0
+    if not os.path.isdir(report_dir):
+        return total
+    import xml.etree.ElementTree as ET
+    for name in os.listdir(report_dir):
+        if not name.endswith(".xml"):
+            continue
+        try:
+            root = ET.parse(os.path.join(report_dir, name)).getroot()
+        except ET.ParseError:
+            continue
+        total += int(root.get("tests", "0"))
+    return total
+
+
 def build_coverage_image(rows):
     services = [r for r in rows if r[1] in {
         "AuthService", "UserAdminService", "RoleAdminService", "AccessTokenAuthenticator",
-        "LoginThrottle", "AuditQueryService", "JwtService", "PasswordPolicy", "User", "Role"}]
+        "LoginThrottle", "AuditQueryService", "JwtService", "PasswordPolicy", "User", "Role",
+        "ProjectService", "TaskService", "ReportService", "ProjectScopeService",
+        "Project", "Task", "Report"}]
     order = ["AuthService", "AccessTokenAuthenticator", "LoginThrottle", "JwtService", "User", "Role",
-             "PasswordPolicy", "AuditQueryService", "RoleAdminService", "UserAdminService"]
+             "PasswordPolicy", "AuditQueryService", "RoleAdminService", "UserAdminService",
+             "Project", "Task", "Report", "ProjectScopeService",
+             "ProjectService", "TaskService", "ReportService"]
     services.sort(key=lambda r: order.index(r[1]) if r[1] in order else 99)
 
     total_cov = sum(r[2] for r in rows)
@@ -87,7 +109,8 @@ def build_coverage_image(rows):
     draw = ImageDraw.Draw(img)
 
     draw.text((40, 30), "LabFlow 后端测试覆盖率摘要", font=font(26, True), fill=INK)
-    draw.text((40, 72), f"来源：JaCoCo 0.8.12 · 102 个用例全部通过 · 整体行覆盖率 {overall:.1f}%",
+    draw.text((40, 72),
+              f"来源：JaCoCo 0.8.12 · {count_tests()} 个用例全部通过 · 整体行覆盖率 {overall:.1f}%",
               font=font(15), fill=MUTED)
 
     cols = [40, 330, 560, 760]
@@ -112,20 +135,25 @@ def build_coverage_image(rows):
         y = draw_row(y, cls, cov, miss, pct)
 
     y = draw_row(y, "全部类合计", total_cov, total_miss, overall, strong=True)
-    draw.text((40, y + 10), "Service / Application 层均 ≥ 60%，且由 JaCoCo check 在 CI 中强制校验。",
+    draw.text((40, y + 10),
+              "门禁：整体行覆盖率 ≥ 85%、identity.application 包 ≥ 80%，由 JaCoCo check 在 verify 阶段强制。",
               font=font(13), fill=MUTED)
 
     img.save(os.path.join(ASSETS, "coverage-summary.png"))
     print("coverage image written, overall", round(overall, 1))
 
 
-def build_architecture_image():
+def build_architecture_image(rows):
     width, height = 1100, 760
     img = Image.new("RGB", (width, height), (250, 252, 254))
     draw = ImageDraw.Draw(img)
 
-    draw.text((40, 32), "LabFlow 系统架构（第一阶段）", font=font(28, True), fill=INK)
-    draw.text((40, 74), "前后端分离 · DDD 模块化单体 · JWT + 服务端会话 · RBAC 动态授权",
+    total_cov = sum(r[2] for r in rows)
+    total_miss = sum(r[3] for r in rows)
+    overall = 100.0 * total_cov / (total_cov + total_miss) if total_cov else 0.0
+
+    draw.text((40, 32), "LabFlow 系统架构", font=font(28, True), fill=INK)
+    draw.text((40, 74), "前后端分离 · DDD 模块化单体 · JWT + 服务端会话 · 角色能力 + 实验室/项目作用域",
               font=font(15), fill=MUTED)
 
     # browser + frontend
@@ -137,13 +165,14 @@ def build_architecture_image():
     # backend container
     rounded(draw, (360, 120, 800, 560), 16, (255, 255, 255), BRAND, 3)
     draw.text((382, 136), "Spring Boot 3.4 模块化单体", font=font(17, True), fill=BRAND)
+    draw.text((382, 160), "shared · identity · research", font=font(12), fill=MUTED)
 
     layers = [
         ("Security Filter Chain", "JWT 认证 · 会话校验 · 方法级授权", 182),
         ("Interfaces 接口层", "Controller · DTO 校验 · VO 映射", 262),
-        ("Application 应用层", "用例编排 · 事务边界 · 事件/审计", 342),
-        ("Domain 领域层", "聚合 · 状态机 · 仓储端口", 422),
-        ("Infrastructure 基础设施层", "JPA 适配器 · 外部服务端口实现", 502),
+        ("Application 应用层", "用例编排 · 作用域校验 · 事务与审计", 342),
+        ("Domain 领域层", "聚合 · 三条状态机 · 仓储端口", 422),
+        ("Infrastructure 基础设施层", "JPA 适配器 · 只读目录 · 外部服务端口", 502),
     ]
     for title, desc, top in layers:
         rounded(draw, (385, top, 775, top + 58), 10, BRAND_LIGHT, BORDER, 1)
@@ -167,7 +196,8 @@ def build_architecture_image():
 
     # test / docs
     rounded(draw, (40, 380, 300, 470), 12, BG)
-    centered(draw, (40, 380, 300, 470), "JUnit 5 + Mockito\nMockMvc + JaCoCo\n58 用例 / 86.7%", font(14))
+    centered(draw, (40, 380, 300, 470),
+             f"JUnit 5 + Mockito\nMockMvc + JaCoCo\n{count_tests()} 用例 / {overall:.1f}%", font(14))
     rounded(draw, (40, 500, 300, 560), 12, BG)
     centered(draw, (40, 500, 300, 560), "Swagger UI\n/v3/api-docs", font(14))
 
@@ -183,5 +213,6 @@ def build_architecture_image():
 
 
 if __name__ == "__main__":
-    build_coverage_image(read_coverage())
-    build_architecture_image()
+    coverage_rows = read_coverage()
+    build_coverage_image(coverage_rows)
+    build_architecture_image(coverage_rows)

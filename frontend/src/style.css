@@ -225,6 +225,59 @@ th {
   color: var(--muted);
 }
 
+.tag.warn {
+  background: #fdf3e3;
+  color: #8a5a00;
+}
+
+.progress {
+  height: 10px;
+  border-radius: 999px;
+  background: #eef1f6;
+  overflow: hidden;
+  margin: 6px 0 4px;
+}
+
+.progress > span {
+  display: block;
+  height: 100%;
+  background: var(--brand);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.inline-form {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.inline-form .field {
+  margin-bottom: 0;
+}
+
+.timeline {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.timeline li {
+  border-left: 3px solid var(--border);
+  padding: 4px 0 10px 12px;
+  font-size: 13px;
+}
+
+.timeline li strong {
+  font-weight: 600;
+}
+
 .chips {
   display: flex;
   flex-wrap: wrap;

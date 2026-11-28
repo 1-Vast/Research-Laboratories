@@ -3,11 +3,12 @@
 面向高校科研实验室的前后端分离协同管理系统：科研项目立项与结项、任务分派与验收、周报汇报、资源预约、成果与知识管理，以及基于授权数据的 AI 辅助科研服务。
 
 - 技术栈：**Vue 3 + TypeScript / Spring Boot 3.4 / Spring Security + JWT / PostgreSQL（本地 H2）**
-- 当前进度：**第一阶段（可运行底座）已完成并通过测试**，第二、三阶段按 [实施计划](docs/design/05-实施计划.md) 推进
+- 当前进度：**第二阶段（科研业务闭环）已完成**——项目立项/结项、任务分派/交付/验收、周报三条工作流前后端打通，`mvn verify` 258 个用例全绿、行覆盖率 92.8%，真实 HTTP 端到端冒烟 72 项断言全通过
 - 设计文档索引：[初步设计总览](docs/design/00-初步设计总览.md) · [架构设计](docs/design/01-架构设计.md) · [数据库设计](docs/design/02-数据库设计.md) · [权限设计](docs/design/03-权限设计.md) · [接口设计](docs/design/04-接口设计.md) · [实施计划](docs/design/05-实施计划.md)
+- 演示与验证：[演示脚本](docs/演示脚本.md)（8 分钟走完全链路，含越权负例与讲解要点） · [测试说明](docs/testing.md)
 - 进展记录：[log/](log/README.md)（按日期归档的开发日志与里程碑状态）
 
-[![CI](https://github.com/1-Vast/Intelligent-Collaborative-Management-Platform-for-Scientific-Research-Laboratories/actions/workflows/ci.yml/badge.svg)](https://github.com/1-Vast/Intelligent-Collaborative-Management-Platform-for-Scientific-Research-Laboratories/actions/workflows/ci.yml)
+[![CI](https://github.com/1-Vast/Research-Laboratories/actions/workflows/ci.yml/badge.svg)](https://github.com/1-Vast/Research-Laboratories/actions/workflows/ci.yml)
 
 ![系统架构](docs/assets/architecture.png)
 
@@ -33,14 +34,16 @@
 
 ## 2. 团队与分工表
 
-> ⚠️ 请按真实情况填写后再提交；分工必须与 Git 提交记录一致。
+> ⚠️ 姓名、学号、贡献比例**必须由本人按真实情况填写**，分工需与 Git 提交记录一致。
 
 | 姓名 | 学号 | 负责模块 | 主要文件/目录 | 贡献比例 |
 | --- | --- | --- | --- | --- |
-| 待填写 | 待填写 | 身份与授权（认证、RBAC）、数据库设计、工程规范 | `backend/src/main/java/com/labflow/identity/**`、`backend/src/main/resources/db/migration/**`、`docs/design/02-数据库设计.md` | 待填写 |
-| 待填写 | 待填写 | 前端页面、测试、业务模块（第二/三阶段） | `frontend/src/**`、`backend/src/test/**`、`docs/testing.md` | 待填写 |
+| 待填写 | 待填写 | 身份与授权（认证、RBAC）、工程规范、CI | `backend/src/main/java/com/labflow/identity/**`、`backend/src/main/resources/db/migration/V1__schema.sql`、`V2__seed_data.sql`、`.github/workflows/ci.yml` | 待填写 |
+| 待填写 | 待填写 | 科研业务模块（项目/任务/周报）、前端业务页、端到端验证、文档校准 | `backend/src/main/java/com/labflow/research/**`、`backend/src/main/resources/db/migration/V3__research_core.sql`、`frontend/src/views/{Projects,ProjectDetail,Tasks,Reports}View.vue`、`frontend/src/api/research.ts`、`scripts/e2e_smoke.py`、`docs/**` | 待填写 |
 
 > 若为 1 人组，请改为单人 100% 并注明；2 人组需保证每人都有后端业务代码与测试代码的提交。
+>
+> 当前提交分布（`git log --format='%ae' | sort | uniq -c`）：`13757415854@163.com` 30 次、`1978543960@qq.com` 9 次。**请按实际写比例**，不要为了好看凑成 50/50——评审会对着 `git shortlog -sn` 看。
 
 ## 3. 技术栈与实际版本
 
@@ -72,12 +75,19 @@
 ```text
 backend/src/main/java/com/labflow/
 ├── shared/            统一响应、异常、traceId、JWT、安全配置、审计、Clock
-└── identity/
-    ├── domain/        聚合与仓储端口（User、Role、Permission、AuthSession、RefreshToken…）
-    ├── application/   用例编排（AuthService、UserAdminService、RoleAdminService、认证器）
-    ├── infrastructure/persistence/  JPA 实体、Spring Data 仓储、端口适配器
-    └── interfaces/rest/             Controller、DTO、VO、映射器
+├── identity/          身份与授权
+│   ├── domain/        聚合与仓储端口（User、Role、Permission、AuthSession、RefreshToken…）
+│   ├── application/   用例编排（AuthService、UserAdminService、RoleAdminService、认证器）
+│   ├── infrastructure/persistence/  JPA 实体、Spring Data 仓储、端口适配器
+│   └── interfaces/rest/             Controller、DTO、VO、映射器
+└── research/          科研业务（项目 / 任务 / 周报）
+    ├── domain/        Project、Task、TaskSubmission、Report、ProjectReview 与状态机
+    ├── application/   ProjectService、TaskService、ReportService、ProjectScopeService
+    ├── infrastructure/persistence/  JPA 实体、复合主键、仓储适配器、只读目录适配器
+    └── interfaces/rest/             ProjectController、TaskController、ReportController、LabController
 ```
+
+`research` 不依赖 `identity` 的实体：判断"这个人是不是这个实验室的 PI / 成员"时，通过 `LabScopeRepository`、`UserDirectory` 这类端口读取，实现层用 `JdbcTemplate` 只查需要的两列，避免模块间实体耦合。
 
 ### 4.2 一次请求的认证时序
 
@@ -121,19 +131,23 @@ sequenceDiagram
 | `lab:create` / `lab:appoint` | ● | | | |
 | `lab:read` | | ● | ● | ● |
 | `lab:member:manage` | | ● | | |
-| `project:create` | | | ● | |
+| `project:create` / `project:update` / `project:delete` / `project:submit` | | | ● | |
 | `project:read` | | ● | ● | ● |
 | `project:approve` / `project:close-review` | | ● | | |
-| `task:create` / `task:assign` / `task:update` / `task:review` | | | ● | |
+| `project:close-request` / `project:member:manage` | | | ● | |
+| `task:create` / `task:update` / `task:delete` / `task:review` | | | ● | |
 | `task:read` | | ● | ● | ● |
 | `task:start` / `task:submit` | | | ● | ● |
-| `report:create` / `report:submit` | | | ● | ● |
+| `report:create` / `report:update` / `report:delete` / `report:submit` | | | ● | ● |
+| `report:read` | | ● | ● | ● |
 | `report:review` | | ● | ● | |
 | `resource:manage` / `booking:review` | | ● | | |
 | `artifact:*` / `knowledge:*` | | 审核 | ● | ● |
 | `audit:read` | ● | ● | | |
 
-权限码共 **49 条**，全部入库（`permissions` 表），可在后台动态授予/撤销，不写死在代码里。
+权限码共 **49 条**，全部入库（`permissions` 表），可在后台动态授予/撤销，不写死在代码里。其中 **26 条已被接口用 `@PreAuthorize` 强制校验**（其余为第二/三阶段预留，如 `artifact:*`、`booking:*`、`notification:*`、`ai:report:generate`）。
+
+> **平台管理员不自动拥有科研数据权限**：`SYS_ADMIN` 只有 `user:manage`、`role:manage`、`lab:create`、`lab:appoint`、`audit:read`，没有 `project:read` / `task:read` / `report:read`。这是有意的——管账号的人不应该顺便能读科研正文。需要时由管理员把对应权限授予具体角色，走的是动态授权链路。
 
 ### 5.3 权限校验在代码中的位置
 
@@ -147,8 +161,10 @@ sequenceDiagram
 ## 6. 数据库设计
 
 - ER 图（Mermaid）与完整表字典：[`docs/design/02-数据库设计.md`](docs/design/02-数据库设计.md)
-- 迁移脚本：`backend/src/main/resources/db/migration/V1__schema.sql`（建表）、`V2__seed_data.sql`（种子数据）
-- 第一阶段 10 张表：
+- 迁移脚本：`V1__schema.sql`（身份与授权 10 张表）、`V2__seed_data.sql`（种子数据）、`V3__research_core.sql`（科研业务 7 张表），Flyway 按版本号顺序执行
+- 共 **17 张表**，课程要求 ≥8
+
+**身份与授权（10 张）**
 
 | 表 | 用途 |
 | --- | --- |
@@ -163,11 +179,25 @@ sequenceDiagram
 | `lab_members` | 实验室成员与 PI 关系（作用域来源） |
 | `audit_events` | 脱敏操作审计（不含正文与令牌） |
 
-主键、唯一约束（用户名、角色码、权限码）、外键、时间戳与索引齐全；表总数 10 ≥ 课程要求的 8。
+**科研业务（7 张，V3）**
+
+| 表 | 用途 | 关键约束 |
+| --- | --- | --- |
+| `projects` | 项目本体、状态、负责人、结项说明、`version` | `ck_projects_status` 限定 6 个状态；`lab_id` 外键 |
+| `project_members` | 项目成员（LEADER / MEMBER） | 复合主键 `(project_id, user_id)` |
+| `project_reviews` | 立项/结项审批轨迹，只增不改 | `review_type ∈ {INIT, CLOSE}` |
+| `tasks` | 任务、受派人、状态、`version` | `assignee_id` 外键；状态检查约束 |
+| `task_submissions` | 交付快照，退回重提不覆盖历史 | `uq_task_submissions_no (task_id, submission_no)` |
+| `reports` | 周报正文、状态、审核人、`version` | `uq_reports_week (project_id, author_id, week_start)` |
+| `report_tasks` | 周报关联任务 | 复合主键 `(report_id, task_id)` |
+
+两处唯一约束是**业务规则的数据库兜底**，不是可选装饰：`uq_reports_week` 保证同一人在同一项目同一周只有一份周报（周起始已在服务层归一到周一，否则 `2026-11-25` 与 `2026-11-23` 会被当成两周）；`uq_task_submissions_no` 保证快照编号不重，退回重提必然产生新编号。
 
 ## 7. 功能清单
 
-### 7.1 已实现（第一阶段）
+### 7.1 已实现
+
+**身份与授权**
 
 | 角色 | 功能 |
 | --- | --- |
@@ -177,15 +207,41 @@ sequenceDiagram
 | 审计查看者（`audit:read`） | 管理员看全部脱敏记录；PI 仅看到与本人相关的记录 |
 | 安全防护 | 登录失败限流（5 次 / 10 分钟 → 429）、Cookie 接口来源校验、越权与登录失败独立落库审计、数据库控制台仅 dev 放行 |
 
+**科研业务（第二阶段）**
+
+| 模块 | 功能 |
+| --- | --- |
+| 实验室 | `GET /labs` 只返回当前用户所属实验室，不暴露全平台组织架构 |
+| 项目 | 草稿创建、编辑、删除（仅草稿可删）、提交立项、PI 审批/驳回（驳回必须填理由）、驳回后重新编辑再提交、申请结项、结项审批/退回、归档；成员增删；进度统计；审批轨迹查询；**当前用户能力查询**（`/permissions`，前端不自行推断 PI 关系） |
+| 任务 | 项目内建任务并分派、编辑、删除（仅 `TODO` 可删）、受派人开始、提交交付、验收通过/退回、取消（必须填理由）、交付快照历史查询、「我的任务」聚合 |
+| 周报 | 新建草稿、编辑、删除（仅草稿可删）、提交、审核通过/退回、关联本项目任务、同周唯一 |
+
+**三条状态机（领域层强制，非法迁移一律 409 `INVALID_STATE_TRANSITION`）**
+
+```text
+项目  DRAFT ──submit──> PENDING ──approve──> ACTIVE ──close-request──> CLOSING ──close-approve──> ARCHIVED
+         ↑                  │                   │                          │
+         └──reopen──────────┘（驳回 REJECTED）   └── 仅 ACTIVE/CLOSING 可维护成员
+                                                └── 存在未完成任务时不允许申请结项
+
+任务  TODO ──start──> IN_PROGRESS ──submit──> SUBMITTED ──approve──> DONE
+        │                    ↑                     │
+        │                    └──────start────── RETURNED（退回必须填理由）
+        └──cancel──> CANCELED（取消不计入进度）
+
+周报  DRAFT ──submit──> SUBMITTED ──approve──> APPROVED
+         ↑                   │
+         └──update───────────┘（退回后回到 DRAFT，可改再提；提交后正文只读）
+```
+
 ### 7.2 已知未完成（如实列出）
 
-- 项目、任务、周报、资源预约、成果知识、通知、AI 周报等业务接口属第二、三阶段，**当前仓库尚未实现**；
-- 前端覆盖登录、注册、工作台、用户管理、角色权限、审计日志 6 个页面，业务页面待第二阶段；
-- 未做浏览器 E2E、Docker Compose、Redis / MinIO / WebSocket（第三阶段）；
-- `lab_members`、`labs` 表已建但暂无对应接口（第二阶段随项目作用域实现）；
+- 资源预约、成果附件、知识库、通知、AI 周报草稿属第三阶段，**当前仓库尚未实现**；对应权限码已在库中预留，但接口未建；
+- 前端共 10 个页面（登录、注册、工作台、用户管理、角色权限、审计日志、项目列表、项目详情、任务、周报），**尚未做浏览器自动化 E2E**，本轮验证方式是构建 + 真实 HTTP 脚本；
+- 未做 Docker Compose、Redis / MinIO / WebSocket（第三阶段）；
 - 登录限流为进程内固定窗口（重启清零、多实例不共享），第三阶段换 Redis 计数；
-- PostgreSQL 集成测试覆盖单实例的迁移/约束/主链路，多线程并发场景随第二阶段业务状态机补充；
-- 审计仅覆盖身份与授权相关操作，业务审计随第二、三阶段接口补充。
+- 并发控制用乐观锁（`version` 字段），高并发下的重试策略未实现，冲突直接返回 409 由前端提示刷新；
+- 审计覆盖身份、授权与科研业务主操作（立项/审批/结项/任务流转/周报审核），资源与成果类操作待第三阶段补齐。
 
 ## 8. 接口文档
 
@@ -195,7 +251,9 @@ sequenceDiagram
 - OpenAPI JSON：`http://localhost:8080/v3/api-docs`
 - 接口清单与错误码：[`docs/design/04-接口设计.md`](docs/design/04-接口设计.md)
 
-主要接口：
+主要接口（共 **57 个**，完整字段见 Swagger）：
+
+**认证与自助（6）**
 
 | 方法 | 路径 | 权限 |
 | --- | --- | --- |
@@ -205,6 +263,11 @@ sequenceDiagram
 | POST | `/api/v1/auth/logout` | 已认证 |
 | GET | `/api/v1/me` | 已认证 |
 | PUT | `/api/v1/me/password` | 已认证（改密后全部会话失效） |
+
+**用户与角色（15）**
+
+| 方法 | 路径 | 权限 |
+| --- | --- | --- |
 | GET/POST | `/api/v1/admin/users`（GET 支持 `keyword`、`sort`、`page`、`size`） | `user:manage` |
 | GET/PATCH/DELETE | `/api/v1/admin/users/{id}` | `user:manage` |
 | PATCH | `/api/v1/admin/users/{id}/enabled` | `user:manage` |
@@ -213,9 +276,57 @@ sequenceDiagram
 | GET/PATCH/DELETE | `/api/v1/admin/roles/{id}` | `role:manage` |
 | PUT | `/api/v1/admin/roles/{id}/permissions` | `role:manage` |
 | GET | `/api/v1/admin/permissions` | `role:manage` |
-| GET | `/api/v1/admin/audit-events` | `audit:read` |
+| GET | `/api/v1/admin/audit-events`（`action`、`actorId`、`page`、`size`） | `audit:read` |
 
-统一返回：`{code, message, data, traceId}`；分页：`{items, total, page, size}`；排序：`sort=field[,asc|desc]`（白名单字段，非法值 400）；登录失败过多或频繁请求返回 429。
+**实验室（1）**
+
+| 方法 | 路径 | 权限 |
+| --- | --- | --- |
+| GET | `/api/v1/labs` | `lab:read`（只返回本人所属实验室） |
+
+**项目（17）**
+
+| 方法 | 路径 | 权限 |
+| --- | --- | --- |
+| GET | `/api/v1/projects`（`labId`、`status`、`keyword`、`sort`、`page`、`size`） | `project:read` |
+| POST | `/api/v1/projects` | `project:create` |
+| GET | `/api/v1/projects/{id}` | `project:read` |
+| PUT / DELETE | `/api/v1/projects/{id}` | `project:update` / `project:delete` |
+| POST | `/api/v1/projects/{id}/submit` | `project:submit` |
+| POST | `/api/v1/projects/{id}/approve` · `/reject` | `project:approve` |
+| POST | `/api/v1/projects/{id}/reopen` | `project:update` |
+| POST | `/api/v1/projects/{id}/close-request` | `project:close-request` |
+| POST | `/api/v1/projects/{id}/close-approve` · `/close-reject` | `project:close-review` |
+| GET / POST | `/api/v1/projects/{id}/members` | `project:read` / `project:member:manage` |
+| DELETE | `/api/v1/projects/{id}/members/{userId}` | `project:member:manage` |
+| GET | `/api/v1/projects/{id}/reviews` | `project:read` |
+| GET | `/api/v1/projects/{id}/permissions` | `project:read` |
+
+**任务（11）**
+
+| 方法 | 路径 | 权限 |
+| --- | --- | --- |
+| GET | `/api/v1/tasks/mine` | `task:read` |
+| GET / POST | `/api/v1/projects/{projectId}/tasks` | `task:read` / `task:create` |
+| GET / PUT / DELETE | `/api/v1/tasks/{id}` | `task:read` / `task:update` / `task:delete` |
+| POST | `/api/v1/tasks/{id}/start` | `task:start`（仅受派人本人） |
+| POST | `/api/v1/tasks/{id}/submit` | `task:submit`（仅受派人本人） |
+| POST | `/api/v1/tasks/{id}/review` | `task:review`（不得验收自己提交的任务） |
+| POST | `/api/v1/tasks/{id}/cancel` | `task:update` |
+| GET | `/api/v1/tasks/{id}/submissions` | `task:read` |
+
+**周报（7）**
+
+| 方法 | 路径 | 权限 |
+| --- | --- | --- |
+| GET / POST | `/api/v1/projects/{projectId}/reports` | `report:read` / `report:create` |
+| GET / PUT / DELETE | `/api/v1/reports/{id}` | `report:read` / `report:update` / `report:delete` |
+| POST | `/api/v1/reports/{id}/submit` | `report:submit` |
+| POST | `/api/v1/reports/{id}/review` | `report:review`（不得审核自己的周报） |
+
+统一返回：`{code, message, data, traceId}`；分页：`{items, total, page, size}`；排序：`sort=field[,asc|desc]`（白名单字段，非法值 400）；登录失败过多或频繁请求返回 429；状态机非法迁移与乐观锁冲突均为 409，用 `code` 区分（`INVALID_STATE_TRANSITION` / `VERSION_CONFLICT`）。
+
+> 权限码只解决"能不能做"，"在哪个范围内做"由应用服务判定：项目类接口按 `project_members` 校验成员关系，审批类接口按 `lab_members` 校验 PI 关系，任务/周报类接口先按 `taskId`/`reportId` 反查所属项目再校验，**避免只改 URL 里的 id 就能读到别人的数据**。
 
 ## 9. 本地运行（15 分钟内可完成）
 
@@ -272,11 +383,11 @@ export JWT_SIGNING_KEY="$(openssl rand -base64 48)"   # 生产必须固定且保
 
 | 用户名 | 密码 | 角色 | 用途 |
 | --- | --- | --- | --- |
-| `admin_demo` | `Labflow@2026` | SYS_ADMIN | 用户/角色/权限管理、动态授权演示 |
-| `pi_demo` | `Labflow@2026` | PI | 实验室 A 负责人（第二阶段审批演示） |
-| `leader_demo` | `Labflow@2026` | PROJECT_LEADER | 项目负责人（第二阶段任务演示） |
-| `researcher_a` | `Labflow@2026` | RESEARCHER | 实验室 A 科研人员 |
-| `researcher_b` | `Labflow@2026` | RESEARCHER | 实验室 B，跨实验室负例对照 |
+| `admin_demo` | `Labflow@2026` | SYS_ADMIN | 用户/角色/权限管理、动态授权演示（无科研数据权限） |
+| `pi_demo` | `Labflow@2026` | PI | 实验室 A 负责人：立项/结项审批、周报审核 |
+| `leader_demo` | `Labflow@2026` | PROJECT_LEADER | 实验室 A 项目负责人：建项目、分派任务、验收 |
+| `researcher_a` | `Labflow@2026` | RESEARCHER | 实验室 A 科研人员：承接任务、写周报 |
+| `researcher_b` | `Labflow@2026` | RESEARCHER | 实验室 B，跨实验室越权负例对照 |
 
 账号均为**虚构演示数据**，密码以 BCrypt 哈希存储于种子脚本，禁止用于生产环境。
 
@@ -293,13 +404,21 @@ mvnw.cmd test        # macOS/Linux: ./mvnw test
 mvnw.cmd verify      # 生成 JaCoCo 覆盖率报告：target/site/jacoco/index.html
 ```
 
+端到端冒烟（真实 HTTP + 真实数据库，需先起 dev 服务）：
+
+```bash
+cd backend && mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=dev   # 终端 1
+python scripts/e2e_smoke.py                                             # 终端 2
+```
+
 ### 11.2 结果（实测）
 
-- **102 个有效用例，全部通过**（接口级 54 个、领域/服务单元 42 个、**真实 PostgreSQL 集成 6 个**）
+- **258 个用例，全部通过**：MockMvc 接口级 93 个、领域/服务/工具单元 159 个、**真实 PostgreSQL 集成 6 个**
 - **真实 PostgreSQL 16 集成测试**：测试启动临时实例，执行与生产完全相同的 Flyway 脚本，验证建表、唯一约束、会话吊销、动态权限与审计
-- **整体行覆盖率 92.2%**；`identity.application` 包 91.9%（最低类 86.9%），JaCoCo 门禁整体 ≥85%、包 ≥80% 已在 CI 中强制
-- 覆盖必测场景：注册重名、弱密码、登录成功/失败（统一提示）、**退出后旧令牌 401**、无权限 403、账号禁用、刷新令牌重放、**动态权限生效**、最后一个管理员保护、内置角色/被引用角色删除、**登录限流 429**、**来源校验**、**越权与失败登录审计留痕**、排序与分页边界
-- CI：GitHub Actions 每次推送执行 `mvnw verify` + 前端构建，[最近一次运行](https://github.com/1-Vast/Intelligent-Collaborative-Management-Platform-for-Scientific-Research-Laboratories/actions/workflows/ci.yml) 成功
+- **整体行覆盖率 92.8%**（2154/2321 行）；JaCoCo 门禁整体 ≥85% 已在 CI 中强制
+- **端到端冒烟 72 项断言全通过**：五账号真实登录、项目/任务/周报三条工作流走完、交付快照不覆盖历史、周报列表回显关联任务、审批轨迹 2 条、审计动作齐全
+- 覆盖必测场景：注册重名、弱密码、登录成功/失败（统一提示）、**退出后旧令牌 401**、无权限 403、账号禁用、刷新令牌重放、**动态权限生效**、最后一个管理员保护、内置角色/被引用角色删除、**登录限流 429**、**来源校验**、**越权与失败登录审计留痕**、排序与分页边界；**业务侧**：草稿态建任务、过期版本 409、非成员读详情 403、负责人自批 403、非受派人开始任务 403、退回后重提快照历史、同周重复周报 409、提交后正文只读、存在未完成任务不允许结项
+- CI：GitHub Actions 每次推送执行 `mvnw verify` + 前端构建，[最近一次运行](https://github.com/1-Vast/Research-Laboratories/actions/workflows/ci.yml)
 
 ![覆盖率摘要](docs/assets/coverage-summary.png)
 
@@ -307,19 +426,19 @@ mvnw.cmd verify      # 生成 JaCoCo 覆盖率报告：target/site/jacoco/index.
 
 ## 12. 附加分申请（如实说明）
 
-第一阶段仅完成必做核心项，**暂未申请附加分**。已具备的基础与后续计划：
+第二阶段完成后，申请以下三项：**架构升级（DDD）**、**安全增强**、**自动化测试进阶（部分）**。其余项未实现，不申请。
 
-| 附加项 | 当前状态 | 计划与验证方式 |
+| 附加项 | 当前状态 | 证据 / 说明 |
 | --- | --- | --- |
-| 架构升级（DDD）+2 | 已建立端口/适配器边界与聚合行为 | 第二、三阶段补齐应用服务/领域事件，展示依赖方向与调用链 |
+| 架构升级（DDD）+2 | **已具备** | 两个业务模块均按 `interfaces → application → domain ← infrastructure` 分层；领域层零 Spring 依赖（`Project`/`Task`/`Report` 为纯 POJO，可脱离容器单测）；跨模块只读访问通过端口（`LabScopeRepository`、`UserDirectory`）而非直接依赖对方实体 |
+| 安全增强 +1 | **已实现，申请** | ① 刷新令牌一次性轮换 + 重放检测吊销；② 登录失败限流 5 次/10 分钟 → 429；③ Cookie 接口来源校验；④ 退出登录服务端吊销会话，旧令牌立即 401；⑤ JWT 不携带权限，每次请求重载，改权限即时生效；⑥ **三层授权**（角色能力 + 实验室作用域 + 项目成员归属），任务/周报接口按 id 反查归属，防水平越权；⑦ 自审拦截（负责人不能批自己的项目、不能验收自己提交的任务、不能审核自己的周报）；⑧ 审计脱敏且按作用域收敛（PI 只看与自己相关的记录） |
+| 自动化测试进阶 +1 | **部分申请** | 258 个用例 + 92.8% 行覆盖率门禁 + 真实 PostgreSQL 集成 + 72 项真实 HTTP 端到端断言；**未做 Playwright 浏览器 E2E**，此项按半档申报 |
 | WebSocket 实时通知 +2 | 未开始 | 第三阶段：STOMP + 认证 + outbox 幂等，双窗口演示 |
 | 外部系统（MinIO/SMTP）+1.5 | 未开始 | 第三阶段：附件私有桶、授权下载、邮件提醒 |
 | AI 集成 +1 | 未开始 | 第三阶段：后端适配器 + 授权数据 + 来源校验 |
-| 自动化测试进阶 +1 | 部分（单元/接口测试已达标） | 第三阶段：Playwright E2E + CI |
-| 安全增强 +1 | **已实现**：刷新令牌轮换与重放吊销、登录失败限流、Cookie 接口来源校验、越权与失败登录审计、审计查询按作用域收敛 | 第三阶段补 Redis 版限流与更多审计维度；是否申请由教师评定 |
 | Redis +0.5 | 未开始 | 第三阶段：吊销标志、缓存、限流 |
 | 部署 +0.5 | 未开始 | 第三阶段：Docker Compose |
-| 无障碍 +0.5 | 部分（表单 label、焦点样式） | 第三阶段：键盘全流程与读屏检查 |
+| 无障碍 +0.5 | 部分（表单 label、焦点样式、状态用文字而非仅颜色区分） | 第三阶段：键盘全流程与读屏检查 |
 
 > 未列出的项视为不申请；最终分值以教师评定为准。
 
@@ -344,10 +463,10 @@ mvnw.cmd verify      # 生成 JaCoCo 覆盖率报告：target/site/jacoco/index.
 
 ## 14. AI 使用说明与核心 Prompt
 
-- 工具：DeepSeek Harness 编码 Agent（模型 `deepseek-flash`），用于第一阶段的设计文档、后端认证与 RBAC、前端页面、测试生成。
+- 工具：DeepSeek Harness 编码 Agent（模型 `deepseek-flash`），用于设计文档、后端认证与 RBAC、科研业务三条工作流、前端页面、测试与端到端脚本生成。
 - 完整记录（含任务级提示词原文、项目书 §39 模块提示词、生成后的修正记录、待人工确认事项）：[`docs/prompts.md`](docs/prompts.md)
-- 关键约束（写入提示词）：权限必须后端校验、密码 BCrypt、退出服务端失效、权限动态生效、不得提交密钥、只使用虚构数据。
-- **学生需自行完成**：逐文件理解代码、按实际填写分工表、在干净环境按 README 复现一次、完成第二/三阶段业务代码，以便答辩时解释自己提交的内容。
+- 关键约束（写入提示词）：权限必须后端校验、密码 BCrypt、退出服务端失效、权限动态生效、不得提交密钥、只使用虚构数据；业务侧额外要求——状态机非法迁移必须 409 而非静默成功、交付快照不得覆盖历史、按 id 访问必须先反查归属再校验成员关系。
+- **学生需自行完成**：逐文件理解代码、按实际填写分工表、在干净环境按 README 复现一次、完成第三阶段业务代码，以便答辩时解释自己提交的内容。
 
 ---
 
@@ -356,19 +475,20 @@ mvnw.cmd verify      # 生成 JaCoCo 覆盖率报告：target/site/jacoco/index.
 ```text
 .
 ├── backend/                 Spring Boot 后端（DDD 模块化单体）
-│   ├── src/main/java/com/labflow/{shared,identity}
+│   ├── src/main/java/com/labflow/{shared,identity,research}
 │   ├── src/main/resources/{application*.yml, db/migration/*.sql}
-│   └── src/test/java/com/labflow/**
-├── frontend/                Vue 3 + TypeScript 前端
-│   └── src/{api,views,components,router,stores}
+│   └── src/test/java/com/labflow/**          258 个用例
+├── frontend/                Vue 3 + TypeScript 前端（10 个页面）
+│   └── src/{api,views,components,router,stores,utils}
 ├── docs/
 │   ├── design/              初步设计（总览、架构、数据库、权限、接口、计划）
 │   ├── assets/              架构图、覆盖率摘要
+│   ├── 演示脚本.md          答辩演示流程、负例与讲解要点
 │   ├── testing.md           测试清单与结果
 │   └── prompts.md           AI 使用记录与核心 prompt
 ├── log/                     项目进展日志（按日期归档、里程碑状态、决策与证据）
 ├── .github/workflows/       CI：后端 verify（含覆盖率门禁）+ 前端构建
-├── scripts/                 文档配图与交付文档生成脚本
+├── scripts/                 文档配图生成 + e2e_smoke.py（真实 HTTP 端到端冒烟）
 ├── .env.example             环境变量模板（无真实密钥）
 └── README.md
 ```
